@@ -11,6 +11,7 @@ BWTA::Chokepoint* choke=NULL;
 
 void guardChoke(Unit*);
 void back2work(Unit*);
+TilePosition getBuildTile(Unit* u, UnitType b, int x, int y);
 
 void ITUBot::onStart(){
 	Broodwar->sendText("Hello world!");
@@ -29,6 +30,7 @@ void ITUBot::onStart(){
 	show_bullets=false;
 	show_visibility_data=false;
 
+	// if its a replay
 	if (Broodwar->isReplay()){
 		Broodwar->printf("The following players are in this replay:");
 		for(std::set<Player*>::iterator p=Broodwar->getPlayers().begin();p!=Broodwar->getPlayers().end();p++){
@@ -37,6 +39,8 @@ void ITUBot::onStart(){
 			}
 		}
 	}
+
+	// if its the actual game
 	else{
 		Broodwar->printf("The match up is %s v %s",
 		Broodwar->self()->getRace().getName().c_str(),
@@ -49,14 +53,7 @@ void ITUBot::onStart(){
 		//send each worker to the mineral field that is closest to it
 		for(std::set<Unit*>::const_iterator i=Broodwar->self()->getUnits().begin();i!=Broodwar->self()->getUnits().end();i++){
 			if ((*i)->getType().isWorker()){
-				Unit* closestMineral=NULL;
-				for(std::set<Unit*>::iterator m=Broodwar->getMinerals().begin();m!=Broodwar->getMinerals().end();m++){
-					if (closestMineral==NULL || (*i)->getDistance(*m)<(*i)->getDistance(closestMineral))
-						closestMineral=*m;
-				}
-
-			if (closestMineral!=NULL)
-				(*i)->rightClick(closestMineral);
+				back2work(*i);
 			}
 			else if ((*i)->getType().isResourceDepot()){
 			
@@ -65,9 +62,9 @@ void ITUBot::onStart(){
 					(*i)->train(Broodwar->self()->getRace().getWorker());
 				}
 
-			}	//is worker closure
+			}	//is resource depot closure
 		}	// isWorker closure
-	}		// isReplay closure
+	}	// isReplay closure
 }
 
 
@@ -116,6 +113,7 @@ void ITUBot::onFrame(){
 	// Iterate through all the units that we own
 	const std::set<Unit*> myUnits = Broodwar->self()->getUnits();
 	for ( std::set<Unit*>::const_iterator u = myUnits.begin(); u != myUnits.end(); ++u ){
+
 		// If the unit is a worker unit
 		if ( (*u)->getType().isWorker() ){
 			if ( (*u)->isIdle() ){  // if our worker is idle
@@ -128,7 +126,9 @@ void ITUBot::onFrame(){
 					back2work(*u);
 			} // closure: if idle
 		}
-		else if ( (*u)->getType().isResourceDepot() ){ // A resource depot is a Command Center, Nexus, or Hatchery
+
+	    // A resource depot is a Command Center, Nexus, or Hatchery
+		else if ( (*u)->getType().isResourceDepot() ){
 
 			// Order the depot to construct more workers! But only when it is idle.
 			if ( (*u)->isIdle() && !(*u)->train((*u)->getType().getRace().getWorker()) ){
@@ -146,6 +146,8 @@ void ITUBot::onFrame(){
 
 				// Retrieve the supply provider type in the case that we have run out of supplies
 				UnitType supplyProviderType = (*u)->getType().getRace().getSupplyProvider();
+				//UnitType supplyProviderType = (*u)->getType().getRace().getRefinery();
+				
 				static int lastChecked = 0;
 
 				// If we are supply blocked and haven't tried constructing more recently
@@ -173,32 +175,31 @@ void ITUBot::onFrame(){
 				
 
 					// If a unit was found
-					if ( supplyBuilder ) {               return;
+					if ( supplyBuilder ) {            
 						if ( supplyProviderType.isBuilding() ){
 
-							  //TilePosition targetBuildLocation = Broodwar->getBuildLocation(supplyProviderType, supplyBuilder->getTilePosition());
-							  TilePosition targetBuildLocation = (TilePosition) home->getCenter();
-							  if ( targetBuildLocation ){
+							if(home != NULL){
+								TilePosition targetBuildLocation = getBuildTile(supplyBuilder, supplyProviderType, home->getCenter().x(), home->getCenter().y()); 
+								
+								if ( targetBuildLocation.x() != -1 && targetBuildLocation.y() != -1 ){
 
-								// Register an event that draws the target build location
-								/* Broodwar->registerEvent([targetBuildLocation,supplyProviderType](Game*)
-											{
-											  Broodwar->drawBoxMap( Position(targetBuildLocation),
-																	Position(targetBuildLocation + supplyProviderType.tileSize()),
-																	Colors::Blue);
-											},
-											nullptr,  // condition
-											supplyProviderType.buildTime() + 100 );  // frames to run */
+									// Register an event that draws the target build location
+									/* Broodwar->registerEvent([targetBuildLocation,supplyProviderType](Game*)
+												{
+												  Broodwar->drawBoxMap( Position(targetBuildLocation),
+																		Position(targetBuildLocation + supplyProviderType.tileSize()),
+																		Colors::Blue);
+												},
+												nullptr,  // condition
+												supplyProviderType.buildTime() + 100 );  // frames to run */
 
 									// Order the builder to construct the supply structure
 									supplyBuilder->build( targetBuildLocation, supplyProviderType );
-							  }
-						}
-						else{
-						  // Train the supply provider (Overlord) if the provider is not a structure
-						  supplyBuilder->train( supplyProviderType );
+								}
+							}
 						}
 					} // closure: supplyBuilder is valid
+
 				} // closure: insufficient supply
 			} // closure: failed to train idle unit
 		}
@@ -570,4 +571,61 @@ void back2work(Unit* u){
 			u->rightClick(closestMineral);
 	  
 	  return;
+}
+
+
+
+TilePosition getBuildTile(Unit* u, UnitType b, int x, int y){
+	TilePosition ret(-1, -1);
+	int maxDist = 3;
+	int stopDist = 40;
+	int tileX = x/32; int tileY = y/32;
+
+	// if Refinery is being built
+	if( b.isRefinery() ){
+		std::set<Unit*>::iterator n = Broodwar->getGeysers().begin();
+		for( ; n != Broodwar->getGeysers().end() ; n++){	// iterate through gaysers
+			if( (abs( (*n)->getTilePosition().x()-tileX ) < stopDist ) &&			
+				(abs( (*n)->getTilePosition().y()-tileY ) < stopDist )
+			){
+				ret.x() = (*n)->getTilePosition().x();
+				ret.y() = (*n)->getTilePosition().y();
+				return ret;
+				//TilePosition retG( (*n)->getTilePosition().x(), (*n)->getTilePosition().y());
+				//return retG;
+			}	
+		}
+	}
+
+
+	while( (maxDist < stopDist) && (ret.x() == -1) ){
+		for (int i = tileX - maxDist ; i <= tileX + maxDist ; ++i){
+			for(int j = tileY - maxDist ; j <= tileY + maxDist ; ++j){
+				if( Broodwar->canBuildHere(u, TilePosition(i,j), b, false) ){
+					
+					//units that are blocking the title
+					bool unitsInWay = false;
+					for(std::set<Unit*>::const_iterator it = Broodwar->self()->getUnits().begin();
+						it != Broodwar->self()->getUnits().end() ; it++){
+						
+						if( (*it)->getID() == u->getID() )	continue;
+						if( (abs((*it)->getTilePosition().x() - i) < 4) && (abs((*it)->getTilePosition().y() - j) < 4) )
+							unitsInWay = true;
+
+						if(unitsInWay == false){
+							ret.x() = i;	ret.y() = j;
+							return ret;
+						}
+					}
+				}
+			}
+
+		}
+		maxDist += 2;
+	}
+
+	if(ret.x() == -1)
+		Broodwar->printf("Unable to find suitable build for position %s", b.getName());
+	
+	return ret;
 }
