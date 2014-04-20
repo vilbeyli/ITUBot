@@ -9,9 +9,14 @@ BWTA::Region* enemy_base;
 Unit* chokeGuardian = NULL; 
 BWTA::Chokepoint* choke=NULL;
 
+
+UnitType drawWhat;
+TilePosition drawPos;
+bool draw = false;
+
 void guardChoke(Unit*);
 void back2work(Unit*);
-TilePosition getBuildTile(Unit* u, UnitType b, int x, int y);
+TilePosition getBuildTile(Unit* u, UnitType b, Position p);
 
 void ITUBot::onStart(){
 	Broodwar->sendText("Hello world!");
@@ -138,11 +143,6 @@ void ITUBot::onFrame(){
 				// so create an event that keeps it on the screen for some frames
 				Position pos = (*u)->getPosition();
 				Error lastErr = Broodwar->getLastError();
-				/*Broodwar->registerEvent([pos,lastErr](Game*){ 
-									Broodwar->drawTextMap(pos, "%c%s", Text::White, lastErr.c_str()); },   // action
-									nullptr,    // condition
-									Broodwar->getLatencyFrames());  // frames to run    
-				*/
 
 				// Retrieve the supply provider type in the case that we have run out of supplies
 				UnitType supplyProviderType = (*u)->getType().getRace().getSupplyProvider();
@@ -177,30 +177,28 @@ void ITUBot::onFrame(){
 					// If a unit was found
 					if ( supplyBuilder ) {            
 						if ( supplyProviderType.isBuilding() ){
-
+							
+							// if the map analysis is completed
 							if(home != NULL){
-								TilePosition targetBuildLocation = getBuildTile(supplyBuilder, supplyProviderType, home->getCenter().x(), home->getCenter().y()); 
+								TilePosition targetBuildLocation = getBuildTile(supplyBuilder, supplyProviderType, home->getCenter()); 
 								
 								if ( targetBuildLocation.x() != -1 && targetBuildLocation.y() != -1 ){
 
-									// Register an event that draws the target build location
-									/* Broodwar->registerEvent([targetBuildLocation,supplyProviderType](Game*)
-												{
-												  Broodwar->drawBoxMap( Position(targetBuildLocation),
-																		Position(targetBuildLocation + supplyProviderType.tileSize()),
-																		Colors::Blue);
-												},
-												nullptr,  // condition
-												supplyProviderType.buildTime() + 100 );  // frames to run */
-
+									// draw the layout
+									draw = true;
+									drawPos = targetBuildLocation;
+									drawWhat = supplyProviderType;
+									
 									// Order the builder to construct the supply structure
 									supplyBuilder->build( targetBuildLocation, supplyProviderType );
 								}
 							}
+
 						}
 					} // closure: supplyBuilder is valid
 
 				} // closure: insufficient supply
+
 			} // closure: failed to train idle unit
 		}
 	} // closure: unit iterator
@@ -422,57 +420,61 @@ void ITUBot::drawVisibilityData()
   }
 }
 
-void ITUBot::drawTerrainData()
-{
-  //we will iterate through all the base locations, and draw their outlines.
-  for(std::set<BWTA::BaseLocation*>::const_iterator i=BWTA::getBaseLocations().begin();i!=BWTA::getBaseLocations().end();i++){
-    TilePosition p=(*i)->getTilePosition();
-    Position c=(*i)->getPosition();
+void ITUBot::drawTerrainData(){
 
-    //draw outline of center location
-    Broodwar->drawBox(CoordinateType::Map,p.x()*32,p.y()*32,p.x()*32+4*32,p.y()*32+3*32,Colors::Blue,false);
+	//we will iterate through all the base locations, and draw their outlines.
+	for(std::set<BWTA::BaseLocation*>::const_iterator i=BWTA::getBaseLocations().begin();i!=BWTA::getBaseLocations().end();i++){
+		TilePosition p=(*i)->getTilePosition();
+		Position c=(*i)->getPosition();
 
-    //draw a circle at each mineral patch
-    for(std::set<BWAPI::Unit*>::const_iterator j=(*i)->getStaticMinerals().begin();j!=(*i)->getStaticMinerals().end();j++)
-    {
-      Position q=(*j)->getInitialPosition();
-      Broodwar->drawCircle(CoordinateType::Map,q.x(),q.y(),30,Colors::Cyan,false);
-    }
+		//draw outline of center location
+		Broodwar->drawBox(CoordinateType::Map,p.x()*32,p.y()*32,p.x()*32+4*32,p.y()*32+3*32,Colors::Blue,false);
 
-    //draw the outlines of vespene geysers
-    for(std::set<BWAPI::Unit*>::const_iterator j=(*i)->getGeysers().begin();j!=(*i)->getGeysers().end();j++)
-    {
-      TilePosition q=(*j)->getInitialTilePosition();
-      Broodwar->drawBox(CoordinateType::Map,q.x()*32,q.y()*32,q.x()*32+4*32,q.y()*32+2*32,Colors::Orange,false);
-    }
+		//draw a circle at each mineral patch
+		for(std::set<BWAPI::Unit*>::const_iterator j=(*i)->getStaticMinerals().begin();j!=(*i)->getStaticMinerals().end();j++)
+		{
+			Position q=(*j)->getInitialPosition();
+			Broodwar->drawCircle(CoordinateType::Map,q.x(),q.y(),30,Colors::Cyan,false);
+		}
 
-    //if this is an island expansion, draw a yellow circle around the base location
-    if ((*i)->isIsland())
-      Broodwar->drawCircle(CoordinateType::Map,c.x(),c.y(),80,Colors::Yellow,false);
-  }
+		//draw the outlines of vespene geysers
+		for(std::set<BWAPI::Unit*>::const_iterator j=(*i)->getGeysers().begin();j!=(*i)->getGeysers().end();j++)
+		{
+			TilePosition q=(*j)->getInitialTilePosition();
+			Broodwar->drawBox(CoordinateType::Map,q.x()*32,q.y()*32,q.x()*32+4*32,q.y()*32+2*32,Colors::Orange,false);
+		}
 
-  //we will iterate through all the regions and draw the polygon outline of it in green.
-  for(std::set<BWTA::Region*>::const_iterator r=BWTA::getRegions().begin();r!=BWTA::getRegions().end();r++)
-  {
-    BWTA::Polygon p=(*r)->getPolygon();
-    for(int j=0;j<(int)p.size();j++)
-    {
-      Position point1=p[j];
-      Position point2=p[(j+1) % p.size()];
-      Broodwar->drawLine(CoordinateType::Map,point1.x(),point1.y(),point2.x(),point2.y(),Colors::Green);
-    }
-  }
+		//if this is an island expansion, draw a yellow circle around the base location
+		if ((*i)->isIsland())
+			Broodwar->drawCircle(CoordinateType::Map,c.x(),c.y(),80,Colors::Yellow,false);
+	}
 
-  //we will visualize the chokepoints with red lines
-  for(std::set<BWTA::Region*>::const_iterator r=BWTA::getRegions().begin();r!=BWTA::getRegions().end();r++)
-  {
-    for(std::set<BWTA::Chokepoint*>::const_iterator c=(*r)->getChokepoints().begin();c!=(*r)->getChokepoints().end();c++)
-    {
-      Position point1=(*c)->getSides().first;
-      Position point2=(*c)->getSides().second;
-      Broodwar->drawLine(CoordinateType::Map,point1.x(),point1.y(),point2.x(),point2.y(),Colors::Red);
-    }
-  }
+	//we will iterate through all the regions and draw the polygon outline of it in green.
+	for(std::set<BWTA::Region*>::const_iterator r=BWTA::getRegions().begin();r!=BWTA::getRegions().end();r++){
+		BWTA::Polygon p=(*r)->getPolygon();
+		for(int j=0;j<(int)p.size();j++){
+			Position point1=p[j];
+			Position point2=p[(j+1) % p.size()];
+			Broodwar->drawLine(CoordinateType::Map,point1.x(),point1.y(),point2.x(),point2.y(),Colors::Green);
+		}
+	}
+
+	//we will visualize the chokepoints with red lines
+	for(std::set<BWTA::Region*>::const_iterator r=BWTA::getRegions().begin();r!=BWTA::getRegions().end();r++){
+		for(std::set<BWTA::Chokepoint*>::const_iterator c=(*r)->getChokepoints().begin();c!=(*r)->getChokepoints().end();c++){
+			Position point1=(*c)->getSides().first;
+			Position point2=(*c)->getSides().second;
+			Broodwar->drawLine(CoordinateType::Map,point1.x(),point1.y(),point2.x(),point2.y(),Colors::Red);
+		}
+	}
+
+	// draw the building layout that is about to be built
+	if(draw == true){
+		if(drawWhat.getName() == "Terran Supply Depot"){
+			Broodwar->drawBoxMap(drawPos.x()*32, drawPos.y()*32, drawPos.x()*32+3*32, drawPos.y()*32+2*32, Colors::Green, false);
+		}
+	}
+
 }
 
 void ITUBot::showPlayers()
@@ -501,42 +503,14 @@ void ITUBot::showForces()
 void ITUBot::onUnitComplete(BWAPI::Unit *unit){
 	if (!Broodwar->isReplay() && Broodwar->getFrameCount()>1)
 		Broodwar->sendText("A %s [%x] has been completed at (%d,%d)",
-								unit->getType().getName().c_str(),
-								unit,unit->getPosition().x(),
-								unit->getPosition().y()
-							);
-
-	  //once a worker is created, send it to work
-	  if ( unit->getType().isWorker() ){
-			// if our worker is idle
-			if ( unit->isIdle() ){
-				back2work(unit);
-			}
-	  }
-  
-	  Unit* closestToStr = NULL;
-	  //if a worker finished building, send it *back* to work
-	  for(std::set<Unit*>::const_iterator i=Broodwar->self()->getUnits().begin();i!=Broodwar->self()->getUnits().end();i++){
-			// find an idle worker
-			if ((*i)->getType().isWorker() && (*i)->isIdle() ){
-				  // should be near the just-completed structure
-				  if(closestToStr == NULL || (*i)->getDistance(unit) < (*i)->getDistance(closestToStr)){
-						closestToStr = *i;
-				  }
-			}
-	  }
-  
-	// if there's no such unit, return
-	if( closestToStr == NULL) return;
-
-	// if there's a worker who finished the structure, send it to closest mineral
-	Unit* closestMineral=NULL;
-	for(std::set<Unit*>::iterator m=Broodwar->getMinerals().begin();m!=Broodwar->getMinerals().end();m++){
-		if (closestMineral==NULL || closestToStr->getDistance(*m) < closestToStr->getDistance(closestMineral))
-			closestMineral=*m;
+							unit->getType().getName().c_str(),
+							unit,unit->getPosition().x(),
+							unit->getPosition().y()
+						);
+	
+	if(unit->getType().isBuilding() == true){
+		draw = false;
 	}
-	if (closestMineral!=NULL)
-		closestToStr->rightClick(closestMineral);
 }
 
 
@@ -575,7 +549,8 @@ void back2work(Unit* u){
 
 
 
-TilePosition getBuildTile(Unit* u, UnitType b, int x, int y){
+TilePosition getBuildTile(Unit* u, UnitType b, Position p){
+	int x =	p.x(); int y = p.y();
 	TilePosition ret(-1, -1);
 	int maxDist = 3;
 	int stopDist = 40;
