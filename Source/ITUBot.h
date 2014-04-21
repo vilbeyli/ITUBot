@@ -40,6 +40,8 @@ public:
 	bool show_bullets;
 	bool show_visibility_data;
 	std::queue<BWAPI::UnitType>& buildOrder() { return _buildOrder; }
+	void populateBuildOrder();
+	void executeBuildOrder(BWAPI::Unit* unit);
 
 private:
 	std::queue<BWAPI::UnitType> _buildOrder;

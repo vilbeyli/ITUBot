@@ -13,12 +13,12 @@ BWTA::Chokepoint* choke=NULL;
 UnitType drawWhat;
 TilePosition drawPos;
 bool draw = false;
-bool builderFound = false;
+Unit* builder = NULL;
+bool FoWError = false;
 
 void guardChoke(Unit*);
 void back2work(Unit*);
-void populateBuildOrder(std::queue<BWAPI::UnitType>& bo);
-TilePosition getBuildTile(Unit* u, UnitType b, Position p);
+TilePosition getBuildTile(Unit* u, UnitType b, Position p, bool shrink = false);
 
 void ITUBot::onStart(){
 	Broodwar->sendText("Hello world!");
@@ -73,7 +73,7 @@ void ITUBot::onStart(){
 		}
 
 		// populate build order - hardcoded
-		populateBuildOrder(buildOrder());
+		populateBuildOrder();
 
 	}	// isReplay closure
 }
@@ -207,99 +207,7 @@ void ITUBot::onFrame(){
 			}
 		}	// closure: BUILD ORDER EMPTY
 
-
-		// build order execution goes here
-		else{
-			//Broodwar->printf("%s(%d) - Unit ID: %d || %d", buildOrder().front().getName().c_str(), buildOrder().size(), (*u)->getID(), builderFound);
-			// if the next unit is a worker in the build order and the current unit is command center
-			if( buildOrder().front() == UnitTypes::Terran_SCV  &&
-				(*u)->getType().isResourceDepot() &&
-				Broodwar->self()->supplyUsed() != Broodwar->self()->supplyTotal() &&
-				Broodwar->self()->minerals() >= 50
-				)
-			{
-				if ( (*u)->train(UnitTypes::Terran_SCV) == true )
-					buildOrder().pop();
-			}
-
-			// if the next unit is Barracks and the current unit is a worker
-			else if( buildOrder().front() == UnitTypes::Terran_Barracks &&
-				(*u)->getType().isWorker() && !(*u)->isConstructing() && (*u)->isCarryingMinerals() &&
-				Broodwar->self()->minerals() >= UnitTypes::Terran_Barracks.mineralPrice() &&
-				home != NULL
-				) 
-			{
-				//Broodwar->printf("BARRACKS: SCV %d is not constructing and Minerals! %d", (*u)->getID(), builderFound);
-				
-				// find a suitable location
-				TilePosition targetBuildLocation = getBuildTile(*u, UnitTypes::Terran_Barracks, home->getCenter());
-				if ( targetBuildLocation.x() != -1 && targetBuildLocation.y() != -1 ){
-
-					// draw the layout
-					draw = true;
-					drawPos = targetBuildLocation;
-					drawWhat = UnitTypes::Terran_Barracks;
-					
-					// Order the builder to construct the supply structure
-					if (builderFound == false){
-						if ( (*u)->build( targetBuildLocation, UnitTypes::Terran_Barracks ) )
-							builderFound = true;
-						else
-							Broodwar->printf("Barracks build (%d, %d) failed.", targetBuildLocation.x(), targetBuildLocation.y());
-					}
-				}
-				else if (targetBuildLocation.x() == -1 || targetBuildLocation.y() == -1) {
-					Broodwar->printf("No suitable location found.");
-				}
-				
-
-			}  // closure : barracks
-
-
-			// if the next unit is Supply Depot and the current unit is a worker
-			else if( buildOrder().front() == UnitTypes::Terran_Supply_Depot &&
-				(*u)->getType().isWorker() && !(*u)->isConstructing() && 
-				Broodwar->self()->minerals() >= UnitTypes::Terran_Supply_Depot.mineralPrice() &&
-				home != NULL
-				) 
-			{
-				
-				// find a suitable location
-				TilePosition targetBuildLocation = getBuildTile(*u, UnitTypes::Terran_Supply_Depot, home->getCenter());
-				if ( targetBuildLocation.x() != -1 && targetBuildLocation.y() != -1 ){
-
-					// draw the layout
-					draw = true;
-					drawPos = targetBuildLocation;
-					drawWhat = UnitTypes::Terran_Supply_Depot;
-					
-					// Order the builder to construct the supply structure
-					if (builderFound == false){
-						if( (*u)->build( targetBuildLocation, UnitTypes::Terran_Supply_Depot ) == true)
-							builderFound = true;
-						else
-							Broodwar->printf("Supply Depot build (%d, %d) failed.", targetBuildLocation.x(), targetBuildLocation.y());
-					}
-					else if (targetBuildLocation.x() == -1 || targetBuildLocation.y() == -1) {
-						Broodwar->printf("No suitable location found.");
-					}
-				}
-
-			}  // closure : supply depot
-
-
-			// if the next unit is a Marine and current unit is Barracks
-			else if ( buildOrder().front() == UnitTypes::Terran_Marine &&
-				(*u)->getType() == UnitTypes::Terran_Barracks &&
-				Broodwar->self()->supplyUsed() != Broodwar->self()->supplyTotal() &&
-				Broodwar->self()->minerals() >= UnitTypes::Terran_Marine.mineralPrice()
-				) 
-			{
-				if ( (*u)->train(UnitTypes::Terran_Marine) == true )
-					buildOrder().pop();
-			}
-
-		}
+		else executeBuildOrder(*u);	//execute order 66 lol
 
 	} // closure: unit iterator
 }
@@ -352,7 +260,7 @@ void ITUBot::onNukeDetect(BWAPI::Position target)
 
 void ITUBot::onUnitDiscover(BWAPI::Unit* unit)
 {
-  if (!Broodwar->isReplay() && Broodwar->getFrameCount()>1);
+  //if (!Broodwar->isReplay() && Broodwar->getFrameCount()>1);
     //Broodwar->sendText("A %s [%x] has been discovered at (%d,%d)",unit->getType().getName().c_str(),unit,unit->getPosition().x(),unit->getPosition().y());
 }
 
@@ -364,7 +272,7 @@ void ITUBot::onUnitEvade(BWAPI::Unit* unit)
 
 void ITUBot::onUnitShow(BWAPI::Unit* unit)
 {
-  if (!Broodwar->isReplay() && Broodwar->getFrameCount()>1);
+  //if (!Broodwar->isReplay() && Broodwar->getFrameCount()>1);
     //Broodwar->sendText("A %s [%x] has been spotted at (%d,%d)",unit->getType().getName().c_str(),unit,unit->getPosition().x(),unit->getPosition().y());
 }
 
@@ -379,10 +287,13 @@ void ITUBot::onUnitCreate(BWAPI::Unit* unit)
 	if (Broodwar->getFrameCount()>1)
 	{
 		if (!Broodwar->isReplay()){
-			Broodwar->sendText("A %s [%x] has been created at (%d,%d)",unit->getType().getName().c_str(),unit,unit->getPosition().x(),unit->getPosition().y());
+			Broodwar->sendText("A %s [%x] has been created at (%d,%d)=(%d,%d)",unit->getType().getName().c_str(),unit,
+																				unit->getPosition().x(),unit->getPosition().y(),
+																				unit->getPosition().x()/32,unit->getPosition().y()/32);
 			if(_buildOrder.empty() == false && unit->getType() == _buildOrder.front()){
-				if( unit->getType().isBuilding() && unit->getType().isResourceDepot() == false ){
-					builderFound = false;
+				if( unit->getType().isBuilding() ){
+					builder = NULL;
+					Broodwar->printf("%s completed. Build order remaining size: %d", _buildOrder.front().getName().c_str(), _buildOrder.size()-1);
 					_buildOrder.pop();
 				}
 			}
@@ -417,20 +328,32 @@ void ITUBot::onUnitDestroy(BWAPI::Unit* unit)
 
 void ITUBot::onUnitMorph(BWAPI::Unit* unit)
 {
-  if (!Broodwar->isReplay())
-    Broodwar->sendText("A %s [%x] has been morphed at (%d,%d)",unit->getType().getName().c_str(),unit,unit->getPosition().x(),unit->getPosition().y());
-  else
-  {
-    /*if we are in a replay, then we will print out the build order
-    (just of the buildings, not the units).*/
-    if (unit->getType().isBuilding() && unit->getPlayer()->isNeutral()==false)
-    {
-      int seconds=Broodwar->getFrameCount()/24;
-      int minutes=seconds/60;
-      seconds%=60;
-      Broodwar->sendText("%.2d:%.2d: %s morphs a %s",minutes,seconds,unit->getPlayer()->getName().c_str(),unit->getType().getName().c_str());
-    }
-  }
+	if (!Broodwar->isReplay()){
+		Broodwar->sendText("A %s [%x] has been morphed at (%d,%d)",unit->getType().getName().c_str(),unit,unit->getPosition().x(),unit->getPosition().y());
+		if(_buildOrder.empty() == false && unit->getType() == _buildOrder.front()){
+			if( unit->getType().isBuilding() ){
+				builder = NULL;
+				Broodwar->printf("%s completed. Build order remaining size: %d", _buildOrder.front().getName().c_str(), _buildOrder.size()-1);
+				_buildOrder.pop();
+			}
+		}
+	}
+	else
+	{
+		/*if we are in a replay, then we will print out the build order
+		(just of the buildings, not the units).*/
+		if (unit->getType().isBuilding() && unit->getPlayer()->isNeutral()==false)
+		{
+			int seconds=Broodwar->getFrameCount()/24;
+			int minutes=seconds/60;
+			seconds%=60;
+			Broodwar->sendText("%.2d:%.2d: %s morphs a %s",minutes,seconds,unit->getPlayer()->getName().c_str(),unit->getType().getName().c_str());
+
+			
+		}
+
+		
+	}
 }
 
 void ITUBot::onUnitRenegade(BWAPI::Unit* unit)
@@ -625,6 +548,29 @@ void ITUBot::onUnitComplete(BWAPI::Unit *unit){
 	}
 }
 
+void ITUBot::populateBuildOrder(){
+	_buildOrder.push(UnitTypes::Terran_SCV);
+	_buildOrder.push(UnitTypes::Terran_SCV);
+	_buildOrder.push(UnitTypes::Terran_SCV);
+	_buildOrder.push(UnitTypes::Terran_SCV);
+	_buildOrder.push(UnitTypes::Terran_Barracks);
+	_buildOrder.push(UnitTypes::Terran_SCV);
+	_buildOrder.push(UnitTypes::Terran_Supply_Depot);
+	_buildOrder.push(UnitTypes::Terran_SCV);
+	_buildOrder.push(UnitTypes::Terran_SCV);
+	_buildOrder.push(UnitTypes::Terran_Supply_Depot);
+	_buildOrder.push(UnitTypes::Terran_SCV);
+	_buildOrder.push(UnitTypes::Terran_Marine);
+	_buildOrder.push(UnitTypes::Terran_SCV);	  
+	_buildOrder.push(UnitTypes::Terran_Marine);	 
+	_buildOrder.push(UnitTypes::Terran_Marine);
+	_buildOrder.push(UnitTypes::Terran_Supply_Depot);
+	_buildOrder.push(UnitTypes::Terran_Refinery);
+
+	Broodwar->printf("Build order populated. Size = %d", _buildOrder.size());
+}
+
+////////////////////////////////////
 
 void guardChoke(Unit* u){
     //get the chokepoints linked to our home region
@@ -661,12 +607,14 @@ void back2work(Unit* u){
 
 
 
-TilePosition getBuildTile(Unit* u, UnitType b, Position p){
+TilePosition getBuildTile(Unit* u, UnitType b, Position p, bool shrink){
 	int x =	p.x(); int y = p.y();
 	TilePosition ret(-1, -1);
 	int maxDist = 3;
-	int stopDist = 50;
+	int stopDist = 30;
 	int tileX = x/32; int tileY = y/32;
+
+	if(shrink == true)	stopDist -= 5;
 
 	// if Refinery is being built
 	if( b.isRefinery() ){
@@ -699,6 +647,7 @@ TilePosition getBuildTile(Unit* u, UnitType b, Position p){
 
 						if(unitsInWay == false){
 							ret.x() = i;	ret.y() = j;
+							//Broodwar->printf("   X: %d, Y:%d for position (%d, %d)", ret.x(), ret.y(), p.x(), p.y());
 							return ret;
 						}
 					}
@@ -714,24 +663,71 @@ TilePosition getBuildTile(Unit* u, UnitType b, Position p){
 	
 	return ret;
 }
-void populateBuildOrder(std::queue<BWAPI::UnitType>& bo){
-	bo.push(UnitTypes::Terran_SCV);
-	bo.push(UnitTypes::Terran_SCV);
-	bo.push(UnitTypes::Terran_SCV);
-	bo.push(UnitTypes::Terran_SCV);
-	bo.push(UnitTypes::Terran_Barracks);
-	bo.push(UnitTypes::Terran_SCV);
-	bo.push(UnitTypes::Terran_Supply_Depot);
-	bo.push(UnitTypes::Terran_SCV);
-	bo.push(UnitTypes::Terran_SCV);
-	bo.push(UnitTypes::Terran_Supply_Depot);
-	bo.push(UnitTypes::Terran_SCV);
-	bo.push(UnitTypes::Terran_Marine);
-	bo.push(UnitTypes::Terran_SCV);	  
-	bo.push(UnitTypes::Terran_Marine);	 
-	bo.push(UnitTypes::Terran_Marine);
-	bo.push(UnitTypes::Terran_Supply_Depot);
-	bo.push(UnitTypes::Terran_Refinery);
 
-	Broodwar->printf("Build order populated. Size = %d", bo.size());
+void ITUBot::executeBuildOrder(Unit* unit){
+	UnitType toBuild = buildOrder().front();
+
+	if(toBuild.isBuilding() == true){
+		
+
+		// if a worker is free				&&  
+		// if we have sufficient minerals	&&  
+		// if the map analysis is done
+		if(unit->getType().isWorker() && !unit->isConstructing() && unit->isCarryingMinerals() &&
+			Broodwar->self()->minerals() >= toBuild.mineralPrice() &&
+			home != NULL
+			)
+		{
+
+			// find a suitable location if the builder is not assigned to work yet		
+			TilePosition targetBuildLocation(-1, -1);	// invalid location by default
+			if(builder == NULL || FoWError == true)
+				targetBuildLocation = getBuildTile(unit, toBuild, home->getCenter());
+			if ( targetBuildLocation.x() != -1 && targetBuildLocation.y() != -1 ){
+
+				// draw the layout
+				draw = true;
+				drawPos = targetBuildLocation;
+				drawWhat = toBuild;
+				
+				// Order the builder to construct the barracks
+				if (builder == NULL || FoWError == true){
+					if (builder == NULL) builder = unit;
+					if ( builder->build( targetBuildLocation, toBuild ) == false ){
+						if(FoWError == false){
+							Broodwar->printf("%s build (%d, %d) failed due to Fog of War.", toBuild.getName().c_str(), targetBuildLocation.x(), targetBuildLocation.y());
+							builder->rightClick((BWAPI::Position)targetBuildLocation);
+							FoWError = true;
+						}
+					}	
+					else{
+						FoWError = false;
+					}
+				}
+		
+			} // closure: if valid location	
+		}  // closure: if enough resources
+
+	}   // closure: building
+
+	// if we are training units
+	else{
+
+		// if the unit is the building that trains the unit in the build order		&&
+		// if we have enough supply to build the unit								&&
+		// if we have the sufficient resources
+		if( unit->getType() == toBuild.whatBuilds().first && 
+			Broodwar->self()->supplyUsed() <= Broodwar->self()->supplyTotal() - toBuild.supplyRequired() &&
+			Broodwar->self()->minerals() >= toBuild.mineralPrice()
+			)
+		{
+			if ( unit->train(toBuild) == true ){
+				Broodwar->printf("%s completed. Build order remaining size: %d", toBuild.getName().c_str(), _buildOrder.size()-1);
+				buildOrder().pop();
+			}
+			else
+				Broodwar->printf("%s train failed.", toBuild.getName().c_str());
+		}
+	}  // closure: unit
+
 }
