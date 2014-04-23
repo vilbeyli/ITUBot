@@ -1,6 +1,9 @@
 #include "ITUBot.h"
 using namespace BWAPI;
 
+///////////////////// GLOBAL VARIABLES
+
+// map analysis variables
 bool analyzed;
 bool analysis_just_finished;
 BWTA::Region* home;
@@ -9,19 +12,25 @@ BWTA::Region* enemy_base;
 Unit* chokeGuardian = NULL; 
 BWTA::Chokepoint* choke=NULL;
 
-
+// Drawing variables
 UnitType drawWhat;
 TilePosition drawPos;
 bool draw = false;
-Unit* builder = NULL;
-bool FoWError = false;
 
+// Build Order building variables
+Unit* builder = NULL;
+bool FoWError = false;	// fog of war error
+int bLastChecked = 0;	// building last checked at frame:
+
+//////////////////// END OF GLOBAL VARIABLES
+
+// function prototypes
 void guardChoke(Unit*);
 void back2work(Unit*);
 TilePosition getBuildTile(Unit* u, UnitType b, Position p, bool shrink = false);
 
 void ITUBot::onStart(){
-	Broodwar->sendText("Hello world!");
+	Broodwar->sendText("ITUBot says Hello world!");
 	Broodwar->printf("The map is %s, a %d player map",Broodwar->mapName().c_str(),Broodwar->getStartLocations().size());
 	
 	// Enable some cheat flags
@@ -62,15 +71,8 @@ void ITUBot::onStart(){
 		for(std::set<Unit*>::const_iterator i=Broodwar->self()->getUnits().begin();i!=Broodwar->self()->getUnits().end();i++){
 			if ((*i)->getType().isWorker())
 				back2work(*i);
-
-			else if ((*i)->getType().isResourceDepot()){
-			
-				//if this is a center, tell it to build the appropiate type of worker
-				if ((*i)->getType().getRace()!=Races::Zerg)
-					(*i)->train(Broodwar->self()->getRace().getWorker());
-
-			}	
-		}
+		}	
+	
 
 		// populate build order - hardcoded
 		populateBuildOrder();
@@ -103,6 +105,21 @@ void ITUBot::onFrame(){
 	if (analysis_just_finished){
 		Broodwar->printf("Finished analyzing map.");
 		analysis_just_finished=false;
+		
+		// assign the closest choke point
+		std::set<BWTA::Chokepoint*> chokepoints= home->getChokepoints();
+		double min_length=10000;
+
+		//iterate through all chokepoints and look for the one with the smallest gap (least width)
+		for(std::set<BWTA::Chokepoint*>::iterator c=chokepoints.begin();c!=chokepoints.end();c++)
+		{
+		  double length=(*c)->getWidth();
+		  if (length<min_length || choke==NULL)
+		  {
+			min_length=length;
+			choke=*c;
+		  }
+		}
 	}
 
 	/*
@@ -157,7 +174,6 @@ void ITUBot::onFrame(){
 
 					// Retrieve the supply provider type in the case that we have run out of supplies
 					UnitType supplyProviderType = (*u)->getType().getRace().getSupplyProvider();
-					//UnitType supplyProviderType = (*u)->getType().getRace().getRefinery();
 					
 					static int lastChecked = 0;
 
@@ -536,27 +552,35 @@ void ITUBot::showForces()
 }
 
 void ITUBot::onUnitComplete(BWAPI::Unit *unit){
-	if (!Broodwar->isReplay() && Broodwar->getFrameCount()>1)
+	if ( !Broodwar->isReplay() && Broodwar->getFrameCount() > 1 ){
 		Broodwar->sendText("A %s [%x] has been completed at (%d,%d)",
 							unit->getType().getName().c_str(),
 							unit,unit->getPosition().x(),
 							unit->getPosition().y()
-						);
-	
-	if(unit->getType().isBuilding() == true){
-		;//draw = false;
+							);
+
+		// send troops to choke point
+		if(unit->getType().isWorker() == false && unit->getType().canAttack() == true){
+			if( choke != NULL){
+				unit->rightClick(choke->getCenter());
+			}
+		}
+
 	}
+	
+
+	
 }
 
 void ITUBot::populateBuildOrder(){
-	_buildOrder.push(UnitTypes::Terran_SCV);
-	_buildOrder.push(UnitTypes::Terran_SCV);
-	_buildOrder.push(UnitTypes::Terran_SCV);
-	_buildOrder.push(UnitTypes::Terran_SCV);
+	_buildOrder.push(UnitTypes::Terran_SCV);			// 5
+	_buildOrder.push(UnitTypes::Terran_SCV);			// 6
+	_buildOrder.push(UnitTypes::Terran_SCV);			// 7
+	_buildOrder.push(UnitTypes::Terran_SCV);			// 8
 	_buildOrder.push(UnitTypes::Terran_Barracks);
-	_buildOrder.push(UnitTypes::Terran_SCV);
+	_buildOrder.push(UnitTypes::Terran_SCV);			// 9
 	_buildOrder.push(UnitTypes::Terran_Supply_Depot);
-	_buildOrder.push(UnitTypes::Terran_SCV);
+	_buildOrder.push(UnitTypes::Terran_SCV);			// 10
 	_buildOrder.push(UnitTypes::Terran_SCV);
 	_buildOrder.push(UnitTypes::Terran_Supply_Depot);
 	_buildOrder.push(UnitTypes::Terran_SCV);
@@ -665,10 +689,9 @@ TilePosition getBuildTile(Unit* u, UnitType b, Position p, bool shrink){
 }
 
 void ITUBot::executeBuildOrder(Unit* unit){
-	UnitType toBuild = buildOrder().front();
 
+	UnitType toBuild = buildOrder().front();
 	if(toBuild.isBuilding() == true){
-		
 
 		// if a worker is free				&&  
 		// if we have sufficient minerals	&&  
@@ -681,8 +704,24 @@ void ITUBot::executeBuildOrder(Unit* unit){
 
 			// find a suitable location if the builder is not assigned to work yet		
 			TilePosition targetBuildLocation(-1, -1);	// invalid location by default
-			if(builder == NULL || FoWError == true)
+			if(builder == NULL || FoWError == true ){
 				targetBuildLocation = getBuildTile(unit, toBuild, home->getCenter());
+				bLastChecked = Broodwar->getFrameCount();
+			}
+
+			// if location is found but the building is not being constructed for some reason
+			else{
+				// if the reason is known by BWAPI
+				if(	Broodwar->getLastError() != Errors::None )
+					Broodwar->printf("Last Error: %s", Broodwar->getLastError().c_str());
+				else{
+					if( bLastChecked + 24*10 < Broodwar->getFrameCount()){
+						Broodwar->printf("Assigning worker again.");
+						builder = NULL;
+						bLastChecked = Broodwar->getFrameCount();
+					}
+				}
+			}	
 			if ( targetBuildLocation.x() != -1 && targetBuildLocation.y() != -1 ){
 
 				// draw the layout
@@ -693,10 +732,22 @@ void ITUBot::executeBuildOrder(Unit* unit){
 				// Order the builder to construct the barracks
 				if (builder == NULL || FoWError == true){
 					if (builder == NULL) builder = unit;
-					if ( builder->build( targetBuildLocation, toBuild ) == false ){
-						if(FoWError == false){
-							Broodwar->printf("%s build (%d, %d) failed due to Fog of War.", toBuild.getName().c_str(), targetBuildLocation.x(), targetBuildLocation.y());
+					if ( builder->build( targetBuildLocation, toBuild ) == false &&
+							builder->isIdle() == false // exclude builder being busy for error printing
+						){
+						
+						if( Broodwar->getLastError() != Errors::None && Broodwar->getLastError() != Errors::Unbuildable_Location)
+							Broodwar->printf("%s build (%d, %d) failed due to %s", toBuild.getName().c_str(), 
+																					targetBuildLocation.x(), 
+																					targetBuildLocation.y(),
+																					Broodwar->getLastError().c_str());
+						else if( FoWError == false ){
+							Broodwar->printf("%s build (%d, %d) failed due to Fog of War.", toBuild.getName().c_str(), 
+																							targetBuildLocation.x(), 
+																							targetBuildLocation.y());
 							builder->rightClick((BWAPI::Position)targetBuildLocation);
+							Broodwar->printf("A worker is sent to the position (%d, %d)",   targetBuildLocation.x(), 
+																							targetBuildLocation.y());
 							FoWError = true;
 						}
 					}	
@@ -714,19 +765,29 @@ void ITUBot::executeBuildOrder(Unit* unit){
 	else{
 
 		// if the unit is the building that trains the unit in the build order		&&
+		// if the structure that is goint to train the unit is completed
 		// if we have enough supply to build the unit								&&
 		// if we have the sufficient resources
 		if( unit->getType() == toBuild.whatBuilds().first && 
+			unit->isCompleted() &&
 			Broodwar->self()->supplyUsed() <= Broodwar->self()->supplyTotal() - toBuild.supplyRequired() &&
 			Broodwar->self()->minerals() >= toBuild.mineralPrice()
 			)
 		{
-			if ( unit->train(toBuild) == true ){
-				Broodwar->printf("%s completed. Build order remaining size: %d", toBuild.getName().c_str(), _buildOrder.size()-1);
-				buildOrder().pop();
+			static int lastChecked = 0;
+
+			// wait a little (1 sec) before training for resources to adjust
+			if( lastChecked + 24 < Broodwar->getFrameCount() ){			
+
+				if ( unit->train(toBuild) == true ){
+					Broodwar->printf("%s completed. Build order remaining size: %d", toBuild.getName().c_str(), _buildOrder.size()-1);
+					buildOrder().pop();
+					lastChecked = Broodwar->getFrameCount();
+				}
+				else{
+					Broodwar->printf("%s - %s train failed.", Broodwar->getLastError().c_str(), toBuild.getName().c_str());
+				}
 			}
-			else
-				Broodwar->printf("%s train failed.", toBuild.getName().c_str());
 		}
 	}  // closure: unit
 
