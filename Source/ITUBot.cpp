@@ -1,11 +1,12 @@
 #include "ITUBot.h"
 using namespace BWAPI;
 
+
 ///////////////////// GLOBAL VARIABLES
 
 // map analysis variables
 bool analyzed;
-bool analysis_just_finished;
+bool analysis_just_finished = false;
 BWTA::Region* home;
 BWTA::Region* enemy_base;
 
@@ -99,27 +100,9 @@ void ITUBot::onFrame(){
 
 	drawStats();
 
-	if (analyzed)
+	if (analyzed){
 		drawTerrainData();
-
-	if (analysis_just_finished){
-		Broodwar->printf("Finished analyzing map.");
-		analysis_just_finished=false;
-		
-		// assign the closest choke point
-		std::set<BWTA::Chokepoint*> chokepoints= home->getChokepoints();
-		double min_length=10000;
-
-		//iterate through all chokepoints and look for the one with the smallest gap (least width)
-		for(std::set<BWTA::Chokepoint*>::iterator c=chokepoints.begin();c!=chokepoints.end();c++)
-		{
-		  double length=(*c)->getWidth();
-		  if (length<min_length || choke==NULL)
-		  {
-			min_length=length;
-			choke=*c;
-		  }
-		}
+		drawChokeData();
 	}
 
 	/*
@@ -383,24 +366,35 @@ void ITUBot::onSaveGame(std::string gameName)
   Broodwar->printf("The game was saved to \"%s\".", gameName.c_str());
 }
 
-DWORD WINAPI AnalyzeThread()
-{
-  BWTA::analyze();
+DWORD WINAPI AnalyzeThread(){
+	BWTA::analyze();
 
-  //self start location only available if the map has base locations
-  if (BWTA::getStartLocation(BWAPI::Broodwar->self())!=NULL)
-  {
-    home       = BWTA::getStartLocation(BWAPI::Broodwar->self())->getRegion();
-  }
-  //enemy start location only available if Complete Map Information is enabled.
-  if (BWTA::getStartLocation(BWAPI::Broodwar->enemy())!=NULL)
-  {
-    enemy_base = BWTA::getStartLocation(BWAPI::Broodwar->enemy())->getRegion();
-  }
-  analyzed   = true;
-  analysis_just_finished = true;
-  //Broodwar->resumeGame();
-  return 0;
+	// self start location only available if the map has base locations
+	if (BWTA::getStartLocation(BWAPI::Broodwar->self())!=NULL)
+		home       = BWTA::getStartLocation(BWAPI::Broodwar->self())->getRegion();
+	
+	// enemy start location only available if Complete Map Information is enabled.
+	if (BWTA::getStartLocation(BWAPI::Broodwar->enemy())!=NULL)
+		enemy_base = BWTA::getStartLocation(BWAPI::Broodwar->enemy())->getRegion();
+	
+	analyzed   = true;
+	analysis_just_finished = true;
+	BWAPI::Broodwar->printf("Finished analyzing map.");
+	
+	// assign the closest choke point
+	std::set<BWTA::Chokepoint*> chokepoints= home->getChokepoints();
+	double min_length=10000;
+
+	// iterate through all chokepoints and look for the one with the smallest gap (least width)
+	for(std::set<BWTA::Chokepoint*>::iterator c=chokepoints.begin();c!=chokepoints.end();c++){
+		double length=(*c)->getWidth();
+		if (length<min_length || choke==NULL){
+			min_length=length;
+			choke=*c;
+		}
+	}
+
+	return 0;
 }
 
 void ITUBot::drawStats()
@@ -526,6 +520,49 @@ void ITUBot::drawTerrainData(){
 		}
 	}
 
+}
+
+void ITUBot::drawChokeData(){
+	const int BTSize = 32;	// build tile size
+	const int WTSize = 8;	// walk tile size
+
+ 	// choke point analysis
+	int x =	choke->getCenter().x(); int y = choke->getCenter().y();
+	int maxDist = 8;				
+	int tileX = x/BTSize;			int tileY = y/BTSize;
+
+	// build tile analysis
+	for (int i = tileX - maxDist ; i <= tileX + maxDist ; ++i){
+		for(int j = tileY - maxDist ; j <= tileY + maxDist ; ++j){
+
+			if( Broodwar->isBuildable( TilePosition(i,j) ) ){
+				if( Broodwar->getGroundHeight( TilePosition(i,j) ) >= 2)
+					Broodwar->drawBox(CoordinateType::Map, i*32, j*32, i*32+32, j*32+32, Colors::Green, false);
+				else
+					Broodwar->drawBox(CoordinateType::Map, i*32, j*32, 32*(i+1), 32*(j+1), Colors::Cyan, false);	
+				
+			}
+			  
+		}  
+	}	
+
+	// walk tile analysis
+	tileX = x/WTSize;	tileY = y/WTSize;	maxDist *= BTSize/WTSize; maxDist /= 2;
+	for (int i = tileX - maxDist ; i <= tileX + maxDist ; ++i){
+		for(int j = tileY - maxDist ; j <= tileY + maxDist ; ++j){
+			
+			if( Broodwar->isWalkable( i,j ) ){
+				//Broodwar->drawBoxMap(i*WTSize, j*WTSize, WTSize*(i+1), WTSize*(j+1), Colors::Blue, false);
+				//Broodwar->drawTextMap(i*WTSize, j*WTSize, "\x11%d, %d", i, j);  
+				Broodwar->drawCircleMap(i*WTSize, j*WTSize, 1, Colors::Orange, false);
+			}
+
+			
+			  
+		}  
+	}
+
+	return;
 }
 
 void ITUBot::showPlayers()

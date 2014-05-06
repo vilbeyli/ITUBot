@@ -1,0 +1,166 @@
+% Building / Unit types
+buildingType(pylonType).	
+buildingType(zealotType).	
+buildingType(probeType).	
+buildingType(gatewayType).
+buildingType(forgeType).	
+
+% Size specifications
+width(pylonType,2).		height(pylonType,2).
+width(zealotType,1).	height(zealotType,1).
+width(probeType,2).		height(probeType,1).
+width(gatewayType,4).	height(gatewayType,3).
+width(forgeType,3). 	height(forgeType,2).
+
+% Gaps
+leftGap(gatewayType,16). 	rightGap(gatewayType,15).	topGap(gatewayType,16). 	bottomGap(gatewayType,7).
+leftGap(pylonType,16). 		rightGap(pylonType,15). 	topGap(pylonType,20). 		bottomGap(pylonType,11).
+leftGap(zealotType,0). 		rightGap(zealotType,0). 	topGap(zealotType,0). 		bottomGap(zealotType,0).
+leftGap(probeType,0). 		rightGap(probeType,0). 		topGap(probeType,0). 		bottomGap(probeType,0).
+leftGap(forgeType,12).		 rightGap(forgeType,11). 	topGap(forgeType,8). 		bottomGap(forgeType,11).
+
+% Facts
+building(pylon1).	type(pylon1, pylonType).
+building(zealot1).	type(zealot1, zealotType).
+building(probe1).	type(probe1, probeType).
+building(gateway1).	type(gateway1, gatewayType).
+building(forge1).	type(forge1, forgeType).
+
+% Constraint: two units/buildings cannot occupy the same tile
+:- occupiedBy(B1, X, Y), occupiedBy(B2, X, Y), B1 != B2.
+
+% Tiles occupied by buildings
+occupiedBy(B,X2,Y2) :- place(B, X1, Y1),
+						type(B, BT), width(BT,Z), height(BT, Q),
+						X2 >= X1, X2 < X1+Z, Y2 >= Y1, Y2 < Y1+Q,
+						walkableTile(X2, Y2).
+						
+
+% Gaps between two adjacent tiles, occupied by buildings.
+verticalGap(X1,Y1,X2,Y2,G) :-
+	occupiedBy(B1,X1,Y1), occupiedBy(B2,X2,Y2),
+	B1 != B2, X1=X2, Y1=Y2-1, G=S1+S2,
+	type(B1,T1), type(B2,T2), bottomGap(T1,S1), topGap(T2,S2).
+	
+verticalGap(X1,Y1,X2,Y2,G) :-
+	occupiedBy(B1,X1,Y1), occupiedBy(B2,X2,Y2),
+	B1 != B2, X1=X2, Y1=Y2+1, G=S1+S2,
+	type(B1,T1), type(B2,T2), bottomGap(T2,S2), topGap(T1,S1).
+	
+horizontalGap(X1,Y1,X2,Y2,G) :-
+	occupiedBy(B1,X1,Y1), occupiedBy(B2,X2,Y2),
+	B1 != B2, X1=X2-1, Y1=Y2, G=S1+S2,
+	type(B1,T1), type(B2,T2), rightGap(T1,S1), leftGap(T2,S2).
+
+horizontalGap(X1,Y1,X2,Y2,G) :-
+	occupiedBy(B1,X1,Y1), occupiedBy(B2,X2,Y2),
+	B1 != B2, X1=X2+1, Y1=Y2, G=S1+S2,
+	type(B1,T1), type(B2,T2), rightGap(T2,S2), leftGap(T1,S1).
+
+	
+% Tile information
+%walkableTile(1,1).		walkableTile(1,2).	
+%walkableTile(2,1).		walkableTile(2,2).
+%walkableTile(2,3).		walkableTile(2,4).
+%walkableTile(3,2).		walkableTile(3,3).
+%walkableTile(3,4).		walkableTile(4,2).
+%walkableTile(4,3).		walkableTile(4,4).
+
+%buildable(pylonType,2,3).	buildable(pylonType, 3,3).
+%buildable(pylonType,3,2).	buildable(zealotType, 2,3).
+%buildable(zealotType, 3,3).	buildable(zealotType, 3,2).
+%buildable(probeType, 2,3).	buildable(probeType, 3,2).
+%buildable(gatewayType,3,2).	buildable(gatewayType,2,3).
+
+%insideBase(3,3).	outsideBase(1,1).
+
+
+% Tile information
+walkableTile(1,1..4).
+walkableTile(2..5,1..8).
+walkableTile(6..8,2..8).
+walkableTile(9,3..8).
+walkableTile(10..11,4..8).
+
+buildable(pylonType,2..10,5).
+buildable(pylonType, 4..10, 4..5).
+buildable(pylonType, 5..8, 3..5).
+buildable(pylonType, 6..7, 2..5).
+
+buildable(gatewayType, 2..8, 5).
+buildable(gatewayType, 4..8, 4).
+buildable(gatewayType, 5..6, 3).
+
+buildable(forgeType, 2..9, 5..6). 
+buildable(forgeType, 4..9, 4).
+buildable(forgeType, 5..7, 3).
+buildable(forgeType, 6, 2).
+
+buildable(zealotType, 2..11, 5).
+buildable(zealotType, 4..11, 4).
+buildable(zealotType, 5..9, 3).
+buildable(zealotType, 6..8, 2).
+
+outsideBase(2,2).	insideBase(7,8).
+
+
+
+% Constraint: Inside of the base must not be reachable.
+:- insideBase(X2,Y2), outsideBase(X1,Y1), canReach(X2,Y2).
+
+% Reachability between tiles.
+blocked(X,Y) :- occupiedBy(B,X,Y), building(B), walkableTile(X,Y).
+canReach(X,Y) :- outsideBase(X,Y).
+
+canReach(X2,Y) :-
+	canReach(X1,Y), X1=X2+1, walkableTile(X1,Y), walkableTile(X2,Y),
+	not blocked(X1,Y), not blocked(X2,Y).
+canReach(X2,Y) :-
+	canReach(X1,Y), X1=X2-1, walkableTile(X1,Y), walkableTile(X2,Y),
+	not blocked(X1,Y), not blocked(X2,Y).
+canReach(X,Y2) :-
+	canReach(X,Y1), Y1=Y2+1, walkableTile(X,Y1), walkableTile(X,Y2),
+	not blocked(X,Y1), not blocked(X,Y2).
+canReach(X,Y2) :-
+	canReach(X,Y1), Y1=Y2-1, walkableTile(X,Y1), walkableTile(X,Y2),
+	not blocked(X,Y1), not blocked(X,Y2).
+canReach(X2,Y2) :-
+	canReach(X1,Y1), X1=X2+1, Y1=Y2+1, walkableTile(X1,Y1), walkableTile(X2,Y2),
+	not blocked(X1,Y1), not blocked(X2,Y2).
+canReach(X2,Y2) :-
+	canReach(X1,Y1), X1=X2-1, Y1=Y2+1, walkableTile(X1,Y1), walkableTile(X2,Y2),
+	not blocked(X1,Y1), not blocked(X2,Y2).
+canReach(X2,Y2) :-
+	canReach(X1,Y1), X1=X2+1, Y1=Y2-1, walkableTile(X1,Y1), walkableTile(X2,Y2),
+	not blocked(X1,Y1), not blocked(X2,Y2).
+canReach(X2,Y2) :-
+	canReach(X1,Y1), X1=X2-1, Y1=Y2-1, walkableTile(X1,Y1), walkableTile(X2,Y2),
+	not blocked(X1,Y1), not blocked(X2,Y2).
+
+% Using gaps to reach (walk on) blocked locations.
+enemyUnitX(16). enemyUnitY(16).
+canReach(X1,Y1) :- horizontalGap(X1,Y1,X2,Y1,G), G >= S, X2=X1+1, canReach(X1,Y3), Y3=Y1+1, enemyUnitX(S).
+canReach(X1,Y1) :- horizontalGap(X1,Y1,X2,Y1,G), G >= S, X2=X1-1, canReach(X1,Y3), Y3=Y1+1, enemyUnitX(S).
+canReach(X1,Y1) :- horizontalGap(X1,Y1,X2,Y1,G), G >= S, X2=X1+1, canReach(X1,Y3), Y3=Y1-1, enemyUnitX(S).
+canReach(X1,Y1) :- horizontalGap(X1,Y1,X2,Y1,G), G >= S, X2=X1-1, canReach(X1,Y3), Y3=Y1-1, enemyUnitX(S).
+canReach(X1,Y1) :- verticalGap(X1,Y1,X1,Y2,G), G >= S, Y2=Y1+1, canReach(X3,Y1), X3=X1-1, enemyUnitY(S).
+canReach(X1,Y1) :- verticalGap(X1,Y1,X1,Y2,G), G >= S, Y2=Y1-1, canReach(X3,Y1), X3=X1-1, enemyUnitY(S).
+canReach(X1,Y1) :- verticalGap(X1,Y1,X1,Y2,G), G >= S, Y2=Y1+1, canReach(X3,Y1), X3=X1+1, enemyUnitY(S).
+canReach(X1,Y1) :- verticalGap(X1,Y1,X1,Y2,G), G >= S, Y2=Y1-1, canReach(X3,Y1), X3=X1+1, enemyUnitY(S).	
+	
+	
+% Generate all the potential placements.
+1[place(pylon1,X,Y) : buildable(pylonType,X,Y)]1.
+%1[place(probe1,X,Y) : buildable(probeType,X,Y)]1.
+%1[place(zealot1,X,Y) : buildable(zealotType,X,Y)]1.
+1[place(forge1,X,Y) : buildable(forgeType,X,Y)]1.
+1[place(gateway1,X,Y) : buildable(gatewayType,X,Y)]1.
+
+
+% Optimization criterion
+#minimize [verticalGap(X1,Y1,X2,Y2,G) = G ].
+#minimize [horizontalGap(X1,Y1,X2,Y2,G) = G ].
+
+#hide.
+#show place/3.
+%#show walkableTile/2.
