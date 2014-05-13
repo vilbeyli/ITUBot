@@ -1,30 +1,25 @@
 % Building / Unit types
-buildingType(pylonType).	
-buildingType(zealotType).	
+buildingType(marineType).	
 buildingType(probeType).	
-buildingType(gatewayType).
-buildingType(forgeType).	
+buildingType(barracksType).
+buildingType(supplyDepotType).	
 
 % Size specifications
-width(pylonType,2).		height(pylonType,2).
-width(zealotType,1).	height(zealotType,1).
+width(marineType,1).	height(marineType,1).
 width(probeType,2).		height(probeType,1).
-width(gatewayType,4).	height(gatewayType,3).
-width(forgeType,3). 	height(forgeType,2).
+width(barracksType,4).	height(barracksType,3).
+width(supplyDepotType,3). 	height(supplyDepotType,2).
 
 % Gaps
-leftGap(gatewayType,16). 	rightGap(gatewayType,15).	topGap(gatewayType,16). 	bottomGap(gatewayType,7).
-leftGap(pylonType,16). 		rightGap(pylonType,15). 	topGap(pylonType,20). 		bottomGap(pylonType,11).
-leftGap(zealotType,0). 		rightGap(zealotType,0). 	topGap(zealotType,0). 		bottomGap(zealotType,0).
-leftGap(probeType,0). 		rightGap(probeType,0). 		topGap(probeType,0). 		bottomGap(probeType,0).
-leftGap(forgeType,12).		 rightGap(forgeType,11). 	topGap(forgeType,8). 		bottomGap(forgeType,11).
+leftGap(barracksType,16). 	rightGap(barracksType,15).	topGap(barracksType,16). 	bottomGap(barracksType,7).
+leftGap(marineType,0). 		rightGap(marineType,0). 	topGap(marineType,0). 		bottomGap(marineType,0).
+leftGap(supplyDepotType,12).		 rightGap(supplyDepotType,11). 	topGap(supplyDepotType,8). 		bottomGap(supplyDepotType,11).
 
 % Facts
-building(pylon1).	type(pylon1, pylonType).
-building(zealot1).	type(zealot1, zealotType).
+building(marine1).	type(marine1, marineType).
 building(probe1).	type(probe1, probeType).
-building(gateway1).	type(gateway1, gatewayType).
-building(forge1).	type(forge1, forgeType).
+building(barracks1).	type(barracks1, barracksType).
+building(supplyDepot1).	type(supplyDepot1, supplyDepotType).
 
 % Constraint: two units/buildings cannot occupy the same tile
 :- occupiedBy(B1, X, Y), occupiedBy(B2, X, Y), B1 != B2.
@@ -57,22 +52,6 @@ horizontalGap(X1,Y1,X2,Y2,G) :-
 	B1 != B2, X1=X2+1, Y1=Y2, G=S1+S2,
 	type(B1,T1), type(B2,T2), rightGap(T2,S2), leftGap(T1,S1).
 
-	
-% Tile information
-%walkableTile(1,1).		walkableTile(1,2).	
-%walkableTile(2,1).		walkableTile(2,2).
-%walkableTile(2,3).		walkableTile(2,4).
-%walkableTile(3,2).		walkableTile(3,3).
-%walkableTile(3,4).		walkableTile(4,2).
-%walkableTile(4,3).		walkableTile(4,4).
-
-%buildable(pylonType,2,3).	buildable(pylonType, 3,3).
-%buildable(pylonType,3,2).	buildable(zealotType, 2,3).
-%buildable(zealotType, 3,3).	buildable(zealotType, 3,2).
-%buildable(probeType, 2,3).	buildable(probeType, 3,2).
-%buildable(gatewayType,3,2).	buildable(gatewayType,2,3).
-
-%insideBase(3,3).	outsideBase(1,1).
 
 
 % Tile information
@@ -82,24 +61,19 @@ walkableTile(6..8,2..8).
 walkableTile(9,3..8).
 walkableTile(10..11,4..8).
 
-buildable(pylonType,2..10,5).
-buildable(pylonType, 4..10, 4..5).
-buildable(pylonType, 5..8, 3..5).
-buildable(pylonType, 6..7, 2..5).
+buildable(barracksType, 2..8, 5).
+buildable(barracksType, 4..8, 4).
+buildable(barracksType, 5..6, 3).
 
-buildable(gatewayType, 2..8, 5).
-buildable(gatewayType, 4..8, 4).
-buildable(gatewayType, 5..6, 3).
+buildable(supplyDepotType, 2..9, 5..6). 
+buildable(supplyDepotType, 4..9, 4).
+buildable(supplyDepotType, 5..7, 3).
+buildable(supplyDepotType, 6, 2).
 
-buildable(forgeType, 2..9, 5..6). 
-buildable(forgeType, 4..9, 4).
-buildable(forgeType, 5..7, 3).
-buildable(forgeType, 6, 2).
-
-buildable(zealotType, 2..11, 5).
-buildable(zealotType, 4..11, 4).
-buildable(zealotType, 5..9, 3).
-buildable(zealotType, 6..8, 2).
+buildable(marineType, 2..11, 5).
+buildable(marineType, 4..11, 4).
+buildable(marineType, 5..9, 3).
+buildable(marineType, 6..8, 2).
 
 outsideBase(2,2).	insideBase(7,8).
 
@@ -150,11 +124,9 @@ canReach(X1,Y1) :- verticalGap(X1,Y1,X1,Y2,G), G >= S, Y2=Y1-1, canReach(X3,Y1),
 	
 	
 % Generate all the potential placements.
-1[place(pylon1,X,Y) : buildable(pylonType,X,Y)]1.
-%1[place(probe1,X,Y) : buildable(probeType,X,Y)]1.
-%1[place(zealot1,X,Y) : buildable(zealotType,X,Y)]1.
-1[place(forge1,X,Y) : buildable(forgeType,X,Y)]1.
-1[place(gateway1,X,Y) : buildable(gatewayType,X,Y)]1.
+1[place(marine1,X,Y) : buildable(marineType,X,Y)]1.
+1[place(supplyDepot1,X,Y) : buildable(supplyDepotType,X,Y)]1.
+1[place(barracks1,X,Y) : buildable(barracksType,X,Y)]1.
 
 
 % Optimization criterion

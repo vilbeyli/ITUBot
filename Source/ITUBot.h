@@ -43,6 +43,8 @@ public:
 	void showForces();
 	bool show_bullets;
 	bool show_visibility_data;
+
+	// build order functions
 	std::queue<BWAPI::UnitType>& buildOrder() { return _buildOrder; }
 	void populateBuildOrder();
 	void executeBuildOrder(BWAPI::Unit* unit);

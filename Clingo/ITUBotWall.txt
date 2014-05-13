@@ -1,20 +1,23 @@
 % Building / Unit types
-buildingType(supplyDepotType).	
-buildingType(barracksType).	
 buildingType(marineType).	
+buildingType(barracksType).
+buildingType(supplyDepotType).	
 
 % Size specifications
-width(supplyDepotType,3).		height(supplyDepotType,2).
-width(barracksType,4).			height(barracksType,3).
+width(marineType,1).	height(marineType,1).
+width(barracksType,4).	height(barracksType,3).
+width(supplyDepotType,3). 	height(supplyDepotType,2).
 
 % Gaps
-leftGap(supplyDepotType,10). 	rightGap(supplyDepotType,9).	topGap(supplyDepotType,10). 	bottomGap(supplyDepotType,5).
-leftGap(barracksType,16). 		rightGap(barracksType,7). 	topGap(barracksType,8). 		bottomGap(barracksType,15).
+leftGap(barracksType,16). 	rightGap(barracksType,15).	topGap(barracksType,16). 	bottomGap(barracksType,7).
+leftGap(marineType,0). 		rightGap(marineType,0). 	topGap(marineType,0). 		bottomGap(marineType,0).
+leftGap(supplyDepotType,12).		 rightGap(supplyDepotType,11). 	topGap(supplyDepotType,8). 		bottomGap(supplyDepotType,11).
 
 % Facts
+building(marine1).	type(marine1, marineType).
+building(barracks1).	type(barracks1, barracksType).
 building(supplyDepot1).	type(supplyDepot1, supplyDepotType).
 building(supplyDepot2).	type(supplyDepot2, supplyDepotType).
-building(barracks1).	type(barracks1, barracksType).
 
 % Constraint: two units/buildings cannot occupy the same tile
 :- occupiedBy(B1, X, Y), occupiedBy(B2, X, Y), B1 != B2.
@@ -47,9 +50,6 @@ horizontalGap(X1,Y1,X2,Y2,G) :-
 	B1 != B2, X1=X2+1, Y1=Y2, G=S1+S2,
 	type(B1,T1), type(B2,T2), rightGap(T2,S2), leftGap(T1,S1).
 
-	
-
-%insideBase(3,3).	outsideBase(1,1).
 
 
 % Tile information
@@ -59,26 +59,23 @@ walkableTile(6..8,2..8).
 walkableTile(9,3..8).
 walkableTile(10..11,4..8).
 
-buildable(pylonType,2..10,5).
-buildable(pylonType, 4..10, 4..5).
-buildable(pylonType, 5..8, 3..5).
-buildable(pylonType, 6..7, 2..5).
+buildable(barracksType, 2..8, 5).
+buildable(barracksType, 4..8, 4).
+buildable(barracksType, 5..6, 3).
 
-buildable(gatewayType, 2..8, 5).
-buildable(gatewayType, 4..8, 4).
-buildable(gatewayType, 5..6, 3).
+buildable(supplyDepotType, 2..9, 5..6). 
+buildable(supplyDepotType, 4..9, 4).
+buildable(supplyDepotType, 5..7, 3).
+buildable(supplyDepotType, 6, 2).
 
-buildable(forgeType, 2..9, 5..6). 
-buildable(forgeType, 4..9, 4).
-buildable(forgeType, 5..7, 3).
-buildable(forgeType, 6, 2).
-
-buildable(zealotType, 2..11, 5).
-buildable(zealotType, 4..11, 4).
-buildable(zealotType, 5..9, 3).
-buildable(zealotType, 6..8, 2).
+buildable(marineType, 2..11, 5).
+buildable(marineType, 4..11, 4).
+buildable(marineType, 5..9, 3).
+buildable(marineType, 6..8, 2).
 
 outsideBase(2,2).	insideBase(7,8).
+
+
 
 % Constraint: Inside of the base must not be reachable.
 :- insideBase(X2,Y2), outsideBase(X1,Y1), canReach(X2,Y2).
@@ -125,9 +122,11 @@ canReach(X1,Y1) :- verticalGap(X1,Y1,X1,Y2,G), G >= S, Y2=Y1-1, canReach(X3,Y1),
 	
 	
 % Generate all the potential placements.
+%1[place(marine1,X,Y) : buildable(marineType,X,Y)]1.
 1[place(supplyDepot1,X,Y) : buildable(supplyDepotType,X,Y)]1.
 1[place(supplyDepot2,X,Y) : buildable(supplyDepotType,X,Y)]1.
 1[place(barracks1,X,Y) : buildable(barracksType,X,Y)]1.
+
 
 
 % Optimization criterion

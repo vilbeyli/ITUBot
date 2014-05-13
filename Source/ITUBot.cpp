@@ -1,6 +1,14 @@
 #include "ITUBot.h"
-using namespace BWAPI;
 
+#include <cassert>
+#include <cstdlib>
+#include <iostream>	
+#include <fstream>
+
+#include <errno.h>
+
+using namespace BWAPI;
+using std::endl;
 
 ///////////////////// GLOBAL VARIABLES
 
@@ -13,7 +21,17 @@ BWTA::Region* enemy_base;
 Unit* chokeGuardian = NULL; 
 BWTA::Chokepoint* choke=NULL;
 
-// Drawing variables
+// choke analysis
+std::string clingoProgramText;  
+std::vector<std::pair<int, int> > buildTiles;
+std::vector<std::pair<int, int> > supplyTiles;
+std::vector<std::pair<int, int> > barracksTiles;
+std::vector<std::pair<int, int> > walkableTiles;
+std::vector<std::pair<int, int> > outsideTiles;	  
+std::pair<int, int> insideBase, outsideBase;
+
+
+// Drawing variables  (to be changed later)
 UnitType drawWhat;
 TilePosition drawPos;
 bool draw = false;
@@ -23,12 +41,21 @@ Unit* builder = NULL;
 bool FoWError = false;	// fog of war error
 int bLastChecked = 0;	// building last checked at frame:
 
+// constants
+const int BTSize = 32;	// build tile size
+const int WTSize = 8;	// walk tile size
+
 //////////////////// END OF GLOBAL VARIABLES
 
 // function prototypes
 void guardChoke(Unit*);
 void back2work(Unit*);
 TilePosition getBuildTile(Unit* u, UnitType b, Position p, bool shrink = false);
+Unit* pickBuilder();
+void initClingoProgramSource();
+void runASPSolver();
+std::pair<int, int> findClosestTile(const std::vector<std::pair<int, int> >& tiles);
+std::pair<int, int> findFarthestTile(const std::vector<std::pair<int, int> >& tiles);
 
 void ITUBot::onStart(){
 	Broodwar->sendText("ITUBot says Hello world!");
@@ -225,13 +252,9 @@ void ITUBot::onSendText(std::string text)
 	} else if (text=="/show visibility")
 	{
 		show_visibility_data=!show_visibility_data;
-	} else if (text=="/analyze")
-	{ /*
-	if (analyzed == false)
+	} else if (text=="/ASP")
 	{
-	  Broodwar->printf("Analyzing map... this may take a minute");
-	  CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)AnalyzeThread, NULL, 0, NULL);
-	} */
+		runASPSolver();
 	} else
 	{
 		Broodwar->printf("You typed '%s'!",text.c_str());
@@ -355,6 +378,27 @@ void ITUBot::onUnitMorph(BWAPI::Unit* unit)
 	}
 }
 
+void ITUBot::onUnitComplete(BWAPI::Unit *unit){
+	if ( !Broodwar->isReplay() && Broodwar->getFrameCount() > 1 ){
+		Broodwar->sendText("A %s [%x] has been completed at (%d,%d)",
+							unit->getType().getName().c_str(),
+							unit,unit->getPosition().x(),
+							unit->getPosition().y()
+							);
+
+		// send troops to choke point
+		if(unit->getType().isWorker() == false && unit->getType().canAttack() == true){
+			if( choke != NULL){
+				unit->rightClick(choke->getCenter());
+			}
+		}
+
+	}
+	
+
+	
+}
+
 void ITUBot::onUnitRenegade(BWAPI::Unit* unit)
 {
   if (!Broodwar->isReplay())
@@ -364,6 +408,57 @@ void ITUBot::onUnitRenegade(BWAPI::Unit* unit)
 void ITUBot::onSaveGame(std::string gameName)
 {
   Broodwar->printf("The game was saved to \"%s\".", gameName.c_str());
+}
+
+//////
+void analyzeChoke(){
+
+ 	// choke point analysis
+	int x =	choke->getCenter().x(); int y = choke->getCenter().y();
+	int maxDist = 10;				
+	int tileX = x/BTSize;			int tileY = y/BTSize;
+
+	// analysis of build tiles near choke points
+	for (int i = tileX - maxDist ; i <= tileX + maxDist ; ++i){
+		for(int j = tileY - maxDist ; j <= tileY + maxDist ; ++j){
+
+			// buildable tile positions
+			if( Broodwar->isBuildable( TilePosition(i,j) ) ){
+
+				// high ground (inside base) tiles
+				if( Broodwar->getGroundHeight( TilePosition(i,j) ) >= 2)
+					buildTiles.push_back( std::make_pair(i, j) );
+					
+
+				// lower ground (outside base) tiles
+				else
+					outsideTiles.push_back( std::make_pair(i, j) );
+					//Broodwar->drawBox(CoordinateType::Map, i*32, j*32, 32*(i+1), 32*(j+1), Colors::Cyan, false);	
+				
+			}
+			  
+		}  
+	}
+
+	Unit* builderr = NULL;
+	builderr = pickBuilder();
+
+	assert(builderr != NULL);
+
+	// analyze buildable tiles for buildings that we will use to wall in (barracks and supply depot)
+	for(unsigned i=0; i<buildTiles.size() ; ++i){
+		TilePosition pos( buildTiles[i].first, buildTiles[i].second );
+
+		if( Broodwar->canBuildHere( builderr, pos, UnitTypes::Terran_Supply_Depot, false ) )
+			supplyTiles.push_back( std::make_pair(pos.x(), pos.y()) );
+
+		if( Broodwar->canBuildHere( builderr, pos, UnitTypes::Terran_Barracks, false ) )
+			barracksTiles.push_back( std::make_pair(pos.x(), pos.y()) );
+	}
+	
+	
+	
+	return;
 }
 
 DWORD WINAPI AnalyzeThread(){
@@ -394,9 +489,14 @@ DWORD WINAPI AnalyzeThread(){
 		}
 	}
 
+	analyzeChoke();
+	initClingoProgramSource();
+	runASPSolver();
+
 	return 0;
 }
 
+/////
 void ITUBot::drawStats()
 {
   // Display the game frame rate as text in the upper left area of the screen
@@ -523,31 +623,47 @@ void ITUBot::drawTerrainData(){
 }
 
 void ITUBot::drawChokeData(){
-	const int BTSize = 32;	// build tile size
-	const int WTSize = 8;	// walk tile size
+	
+	// draw buildable tiles
+	for(unsigned i = 0; i < buildTiles.size() ; ++i){
+		int x = buildTiles[i].first;
+		int y = buildTiles[i].second;
+		Broodwar->drawBoxMap(x*BTSize , y*BTSize, (x+1)*BTSize, (y+1)*BTSize, Colors::Green, false);
+		Broodwar->drawTextMap(x*BTSize, y*BTSize, "%d,\n%d", x, y);
+	}
+	
+	 // draw possible supply depot tiles
+	for(unsigned i = 0; i < supplyTiles.size() ; ++i){
+		int x = supplyTiles[i].first;
+		int y = supplyTiles[i].second;
+		Broodwar->drawBoxMap(x*BTSize+5 , y*BTSize+5, (x+1)*BTSize-5, (y+1)*BTSize-5, Colors::Red, false);
+	}
+	
+	// draw possible barracks tiles
+	for(unsigned i = 0; i < barracksTiles.size() ; ++i){
+		int x = barracksTiles[i].first;
+		int y = barracksTiles[i].second;
+		Broodwar->drawBoxMap(x*BTSize+8 , y*BTSize+8, (x+1)*BTSize-8, (y+1)*BTSize-8, Colors::Blue, false);
+	}
 
- 	// choke point analysis
-	int x =	choke->getCenter().x(); int y = choke->getCenter().y();
-	int maxDist = 8;				
-	int tileX = x/BTSize;			int tileY = y/BTSize;
+	// draw buildable tiles
+	for(unsigned i = 0; i < outsideTiles.size() ; ++i){
+		int x = outsideTiles[i].first;
+		int y = outsideTiles[i].second;
+		Broodwar->drawBoxMap(x*BTSize , y*BTSize, (x+1)*BTSize, (y+1)*BTSize, Colors::Cyan, false);
+		Broodwar->drawTextMap(x*BTSize, y*BTSize, "%d,\n%d", x, y);
+	}
+	int x,y;
 
-	// build tile analysis
-	for (int i = tileX - maxDist ; i <= tileX + maxDist ; ++i){
-		for(int j = tileY - maxDist ; j <= tileY + maxDist ; ++j){
+	x = insideBase.first; y = insideBase.second;
+	Broodwar->drawBoxMap(x*BTSize , y*BTSize, (x+1)*BTSize, (y+1)*BTSize, Colors::Green, true);
 
-			if( Broodwar->isBuildable( TilePosition(i,j) ) ){
-				if( Broodwar->getGroundHeight( TilePosition(i,j) ) >= 2)
-					Broodwar->drawBox(CoordinateType::Map, i*32, j*32, i*32+32, j*32+32, Colors::Green, false);
-				else
-					Broodwar->drawBox(CoordinateType::Map, i*32, j*32, 32*(i+1), 32*(j+1), Colors::Cyan, false);	
-				
-			}
-			  
-		}  
-	}	
+	x = outsideBase.first; y = outsideBase.second;
+	Broodwar->drawBoxMap(x*BTSize , y*BTSize, (x+1)*BTSize, (y+1)*BTSize, Colors::Cyan, true);
 
+	/*
 	// walk tile analysis
-	tileX = x/WTSize;	tileY = y/WTSize;	maxDist *= BTSize/WTSize; maxDist /= 2;
+	tileX = x/WTSize;	tileY = y/WTSize;	maxDist *= BTSize/WTSize;
 	for (int i = tileX - maxDist ; i <= tileX + maxDist ; ++i){
 		for(int j = tileY - maxDist ; j <= tileY + maxDist ; ++j){
 			
@@ -561,10 +677,10 @@ void ITUBot::drawChokeData(){
 			  
 		}  
 	}
-
-	return;
+	*/
 }
 
+/////
 void ITUBot::showPlayers()
 {
   std::set<Player*> players=Broodwar->getPlayers();
@@ -588,27 +704,8 @@ void ITUBot::showForces()
   }
 }
 
-void ITUBot::onUnitComplete(BWAPI::Unit *unit){
-	if ( !Broodwar->isReplay() && Broodwar->getFrameCount() > 1 ){
-		Broodwar->sendText("A %s [%x] has been completed at (%d,%d)",
-							unit->getType().getName().c_str(),
-							unit,unit->getPosition().x(),
-							unit->getPosition().y()
-							);
 
-		// send troops to choke point
-		if(unit->getType().isWorker() == false && unit->getType().canAttack() == true){
-			if( choke != NULL){
-				unit->rightClick(choke->getCenter());
-			}
-		}
-
-	}
-	
-
-	
-}
-
+/////
 void ITUBot::populateBuildOrder(){
 	_buildOrder.push(UnitTypes::Terran_SCV);			// 5
 	_buildOrder.push(UnitTypes::Terran_SCV);			// 6
@@ -630,101 +727,6 @@ void ITUBot::populateBuildOrder(){
 
 	Broodwar->printf("Build order populated. Size = %d", _buildOrder.size());
 }
-
-////////////////////////////////////
-
-void guardChoke(Unit* u){
-    //get the chokepoints linked to our home region
-    std::set<BWTA::Chokepoint*> chokepoints= home->getChokepoints();
-    double min_length=10000;
-
-    //iterate through all chokepoints and look for the one with the smallest gap (least width)
-    for(std::set<BWTA::Chokepoint*>::iterator c=chokepoints.begin();c!=chokepoints.end();c++)
-    {
-      double length=(*c)->getWidth();
-      if (length<min_length || choke==NULL)
-      {
-        min_length=length;
-        choke=*c;
-      }
-    }
-
-    //order the worker to move to the center of the gap
-    u->rightClick(choke->getCenter());
-    return;
-}
-
-void back2work(Unit* u){
-	  Unit* closestMineral=NULL;
-	  for(std::set<Unit*>::iterator m=Broodwar->getMinerals().begin();m!=Broodwar->getMinerals().end();m++){
-			if (closestMineral==NULL || u->getDistance(*m)< u->getDistance(closestMineral))
-				closestMineral=*m;
-	  }
-	  if (closestMineral!=NULL)
-			u->rightClick(closestMineral);
-	  
-	  return;
-}
-
-
-
-TilePosition getBuildTile(Unit* u, UnitType b, Position p, bool shrink){
-	int x =	p.x(); int y = p.y();
-	TilePosition ret(-1, -1);
-	int maxDist = 3;
-	int stopDist = 30;
-	int tileX = x/32; int tileY = y/32;
-
-	if(shrink == true)	stopDist -= 5;
-
-	// if Refinery is being built
-	if( b.isRefinery() ){
-		std::set<Unit*>::iterator n = Broodwar->getGeysers().begin();
-		for( ; n != Broodwar->getGeysers().end() ; n++){	// iterate through gaysers
-			if( (abs( (*n)->getTilePosition().x()-tileX ) < stopDist ) &&			
-				(abs( (*n)->getTilePosition().y()-tileY ) < stopDist )
-			){
-				ret.x() = (*n)->getTilePosition().x();
-				ret.y() = (*n)->getTilePosition().y();
-				return ret;
-			}	
-		}
-	}
-
-
-	while( (maxDist < stopDist) && (ret.x() == -1) ){
-		for (int i = tileX - maxDist ; i <= tileX + maxDist ; ++i){
-			for(int j = tileY - maxDist ; j <= tileY + maxDist ; ++j){
-				if( Broodwar->canBuildHere(u, TilePosition(i,j), b, false) ){
-					
-					//units that are blocking the title
-					bool unitsInWay = false;
-					for(std::set<Unit*>::const_iterator it = Broodwar->self()->getUnits().begin();
-						it != Broodwar->self()->getUnits().end() ; it++){
-						
-						if( (*it)->getID() == u->getID() )	continue;
-						if( (abs((*it)->getTilePosition().x() - i) < 4) && (abs((*it)->getTilePosition().y() - j) < 4) )
-							unitsInWay = true;
-
-						if(unitsInWay == false){
-							ret.x() = i;	ret.y() = j;
-							//Broodwar->printf("   X: %d, Y:%d for position (%d, %d)", ret.x(), ret.y(), p.x(), p.y());
-							return ret;
-						}
-					}
-				}
-			}
-
-		}
-		maxDist += 2;
-	}
-
-	if(ret.x() == -1)
-		Broodwar->printf("Unable to find suitable build for position %s", b.getName());
-	
-	return ret;
-}
-
 void ITUBot::executeBuildOrder(Unit* unit){
 
 	UnitType toBuild = buildOrder().front();
@@ -829,3 +831,327 @@ void ITUBot::executeBuildOrder(Unit* unit){
 	}  // closure: unit
 
 }
+
+////////////////////////////////////
+
+void guardChoke(Unit* u){
+    //get the chokepoints linked to our home region
+    std::set<BWTA::Chokepoint*> chokepoints= home->getChokepoints();
+    double min_length=10000;
+
+    //iterate through all chokepoints and look for the one with the smallest gap (least width)
+    for(std::set<BWTA::Chokepoint*>::iterator c=chokepoints.begin();c!=chokepoints.end();c++)
+    {
+      double length=(*c)->getWidth();
+      if (length<min_length || choke==NULL)
+      {
+        min_length=length;
+        choke=*c;
+      }
+    }
+
+    //order the worker to move to the center of the gap
+    u->rightClick(choke->getCenter());
+    return;
+}
+
+void back2work(Unit* u){
+	  Unit* closestMineral=NULL;
+	  for(std::set<Unit*>::iterator m=Broodwar->getMinerals().begin();m!=Broodwar->getMinerals().end();m++){
+			if (closestMineral==NULL || u->getDistance(*m)< u->getDistance(closestMineral))
+				closestMineral=*m;
+	  }
+	  if (closestMineral!=NULL)
+			u->rightClick(closestMineral);
+	  
+	  return;
+}
+
+
+
+TilePosition getBuildTile(Unit* u, UnitType b, Position p, bool shrink){
+	int x =	p.x(); int y = p.y();
+	TilePosition ret(-1, -1);
+	int maxDist = 3;
+	int stopDist = 30;
+	int tileX = x/32; int tileY = y/32;
+
+	if(shrink == true)	stopDist -= 5;
+
+	// if Refinery is being built
+	if( b.isRefinery() ){
+		std::set<Unit*>::iterator n = Broodwar->getGeysers().begin();
+		for( ; n != Broodwar->getGeysers().end() ; n++){	// iterate through gaysers
+			if( (abs( (*n)->getTilePosition().x()-tileX ) < stopDist ) &&			
+				(abs( (*n)->getTilePosition().y()-tileY ) < stopDist )
+			){
+				ret.x() = (*n)->getTilePosition().x();
+				ret.y() = (*n)->getTilePosition().y();
+				return ret;
+			}	
+		}
+	}
+
+
+	while( (maxDist < stopDist) && (ret.x() == -1) ){
+		for (int i = tileX - maxDist ; i <= tileX + maxDist ; ++i){
+			for(int j = tileY - maxDist ; j <= tileY + maxDist ; ++j){
+				if( Broodwar->canBuildHere(u, TilePosition(i,j), b, false) ){
+					
+					//units that are blocking the title
+					bool unitsInWay = false;
+					for(std::set<Unit*>::const_iterator it = Broodwar->self()->getUnits().begin();
+						it != Broodwar->self()->getUnits().end() ; it++){
+						
+						if( (*it)->getID() == u->getID() )	continue;
+						if( (abs((*it)->getTilePosition().x() - i) < 4) && (abs((*it)->getTilePosition().y() - j) < 4) )
+							unitsInWay = true;
+
+						if(unitsInWay == false){
+							ret.x() = i;	ret.y() = j;
+							//Broodwar->printf("   X: %d, Y:%d for position (%d, %d)", ret.x(), ret.y(), p.x(), p.y());
+							return ret;
+						}
+					}
+				}
+			}
+
+		}
+		maxDist += 2;
+	}
+
+	if(ret.x() == -1)
+		Broodwar->printf("Unable to find suitable build for position %s", b.getName());
+	
+	return ret;
+}
+
+
+Unit* pickBuilder(){
+
+	// Iterate through all the units that we own
+	const std::set<Unit*> myUnits = Broodwar->self()->getUnits();
+	for ( std::set<Unit*>::const_iterator un = myUnits.begin(); un != myUnits.end(); ++un ){
+		if( (*un)->getType().isWorker() && (*un)->isConstructing() == false) {
+
+			//BWAPI::Broodwar->printf("found one" );
+			return *un;
+			
+		}
+	}
+
+	//BWAPI::Broodwar->printf("Worker Not Found, so, NULL");
+	return NULL;
+}	 
+
+
+std::pair<int, int> findClosestTile(const std::vector<std::pair<int, int> >& tiles){
+	std::pair<int, int> ret;
+	Position p;
+	std::set<Unit*> units = Broodwar->self()->getUnits();
+	for(std::set<Unit*>::const_iterator u = units.begin() ; u != units.end() ; ++u){
+		if( (*u)->getType() == UnitTypes::Terran_Command_Center ){
+			p = (*u)->getPosition();
+			break;
+		}
+	}
+
+	double dist = 9000000000;
+
+	for(std::vector<std::pair<int, int> >::const_iterator it = tiles.begin() ; it != tiles.end() ; ++it){
+		if(p.getDistance( Position(it->first, it->second) ) <= dist){
+			dist =	p.getDistance( Position(it->first, it->second) );
+			ret = *it;
+		}
+	}
+
+	return ret;
+}
+
+std::pair<int, int> findFarthestTile(const std::vector<std::pair<int, int> >& tiles){
+	std::pair<int, int> ret;
+	Position p;
+	std::set<Unit*> units = Broodwar->self()->getUnits();
+	for(std::set<Unit*>::const_iterator u = units.begin() ; u != units.end() ; ++u){
+		if( (*u)->getType() == UnitTypes::Terran_Command_Center ){
+			p = (*u)->getPosition();
+			break;
+		}
+	}
+	
+	double dist = 0;
+
+	for(std::vector<std::pair<int, int> >::const_iterator it = tiles.begin() ; it != tiles.end() ; ++it){
+		if(p.getDistance( Position(it->first, it->second) ) >= dist){
+			dist =	p.getDistance( Position(it->first, it->second) );
+			ret = *it;
+		}
+	}
+
+	return ret;
+}
+void initClingoProgramSource(){
+	std::ofstream file;
+
+	file.open("bwapi-data/AI/ITUBotWall.txt");
+	if(file.is_open()){
+
+		file << "% Building / Unit types" << endl
+			<< "buildingType(marineType).	" << endl
+			<< "buildingType(barracksType)." << endl
+			<< "buildingType(supplyDepotType).	" << endl  << endl
+
+			<< "% Size specifications" << endl
+			<< "width(marineType,1).	height(marineType,1)." << endl
+			<< "width(barracksType,4).	height(barracksType,3)." << endl
+			<< "width(supplyDepotType,3). 	height(supplyDepotType,2)." << endl	 << endl
+
+			<< "% Gaps" << endl
+			<< "leftGap(barracksType,16). 	rightGap(barracksType,15).	topGap(barracksType,16). 	bottomGap(barracksType,7)." << endl
+			<< "leftGap(marineType,0). 		rightGap(marineType,0). 	topGap(marineType,0). 		bottomGap(marineType,0)." << endl
+			<< "leftGap(supplyDepotType,12).		 rightGap(supplyDepotType,11). 	topGap(supplyDepotType,8). 		bottomGap(supplyDepotType,11)." << endl	 << endl
+
+			<< "% Facts" << endl
+			<< "building(marine1).	type(marine1, marineType)." << endl
+			<< "building(barracks1).	type(barracks1, barracksType)." << endl
+			<< "building(supplyDepot1).	type(supplyDepot1, supplyDepotType)." << endl
+			<< "building(supplyDepot2).	type(supplyDepot2, supplyDepotType)." << endl   << endl
+
+			<< "% Constraint: two units/buildings cannot occupy the same tile" << endl
+			<< ":- occupiedBy(B1, X, Y), occupiedBy(B2, X, Y), B1 != B2." << endl	  << endl
+
+			<< "% Tiles occupied by buildings" << endl
+			<< "occupiedBy(B,X2,Y2) :- place(B, X1, Y1)," << endl
+			<< "						type(B, BT), width(BT,Z), height(BT, Q)," << endl
+			<< "						X2 >= X1, X2 < X1+Z, Y2 >= Y1, Y2 < Y1+Q," << endl
+			<< "						walkableTile(X2, Y2)." << endl
+			<< "						" << endl  << endl
+
+			<< "% Gaps between two adjacent tiles, occupied by buildings." << endl
+			<< "verticalGap(X1,Y1,X2,Y2,G) :-" << endl
+			<< "	occupiedBy(B1,X1,Y1), occupiedBy(B2,X2,Y2)," << endl
+			<< "	B1 != B2, X1=X2, Y1=Y2-1, G=S1+S2," << endl
+			<< "	type(B1,T1), type(B2,T2), bottomGap(T1,S1), topGap(T2,S2)." << endl 
+			<< "	" << endl
+			<< "verticalGap(X1,Y1,X2,Y2,G) :-" << endl
+			<< "	occupiedBy(B1,X1,Y1), occupiedBy(B2,X2,Y2)," << endl
+			<< "	B1 != B2, X1=X2, Y1=Y2+1, G=S1+S2," << endl
+			<< "	type(B1,T1), type(B2,T2), bottomGap(T2,S2), topGap(T1,S1)." << endl
+			<< "	" << endl
+			<< "horizontalGap(X1,Y1,X2,Y2,G) :-" << endl
+			<< "	occupiedBy(B1,X1,Y1), occupiedBy(B2,X2,Y2)," << endl
+			<< "	B1 != B2, X1=X2-1, Y1=Y2, G=S1+S2," << endl
+			<< "	type(B1,T1), type(B2,T2), rightGap(T1,S1), leftGap(T2,S2)." << endl		 << endl
+
+			<< "horizontalGap(X1,Y1,X2,Y2,G) :-" << endl
+			<< "	occupiedBy(B1,X1,Y1), occupiedBy(B2,X2,Y2)," << endl
+			<< "	B1 != B2, X1=X2+1, Y1=Y2, G=S1+S2," << endl
+			<< "	type(B1,T1), type(B2,T2), rightGap(T2,S2), leftGap(T1,S1)." << endl<< endl
+
+
+			///////////////
+			<< "% Tile information" << endl;
+
+			for(std::vector<std::pair<int, int> >::const_iterator it = buildTiles.begin();
+				it != buildTiles.end(); ++it){
+				file << "walkableTile(" << it->first << ", " << it->second << ")." << endl;
+			}
+			for(std::vector<std::pair<int, int> >::const_iterator it = outsideTiles.begin();
+				it != outsideTiles.end(); ++it){
+				file << "walkableTile(" << it->first << ", " << it->second << ")." << endl;
+			}
+
+			for(std::vector<std::pair<int, int> >::const_iterator it = barracksTiles.begin();
+				it != barracksTiles.end(); ++it){
+				file << "buildable(barracksType, " << it->first << ", " << it->second << ")." << endl;
+			}
+
+			for(std::vector<std::pair<int, int> >::const_iterator it = supplyTiles.begin();
+				it != supplyTiles.end(); ++it){
+				file << "buildable(supplyDepotType, " << it->first << ", " << it->second << ")." << endl;
+			}
+			////////////////////////
+
+			insideBase = findClosestTile(buildTiles);
+			outsideBase = findFarthestTile(outsideTiles);
+			file << endl << "insideBase(" << insideBase.first << ", " << insideBase.second << ").\t";
+			file << "outsideBase(" << outsideBase.first << ", " << outsideBase.second << ")." << endl << endl
+
+
+			<< "% Constraint: Inside of the base must not be reachable." << endl
+			<< ":- insideBase(X2,Y2), outsideBase(X1,Y1), canReach(X2,Y2)." << endl	<< endl
+
+			<< "% Reachability between tiles." << endl
+			<< "blocked(X,Y) :- occupiedBy(B,X,Y), building(B), walkableTile(X,Y)." << endl
+			<< "canReach(X,Y) :- outsideBase(X,Y)." << endl	 << endl
+
+			<< "canReach(X2,Y) :-" << endl
+			<< "	canReach(X1,Y), X1=X2+1, walkableTile(X1,Y), walkableTile(X2,Y)," << endl
+			<< "	not blocked(X1,Y), not blocked(X2,Y)." << endl
+			<< "canReach(X2,Y) :-" << endl
+			<< "	canReach(X1,Y), X1=X2-1, walkableTile(X1,Y), walkableTile(X2,Y)," << endl
+			<< "	not blocked(X1,Y), not blocked(X2,Y)." << endl
+			<< "canReach(X,Y2) :-" << endl
+			<< "	canReach(X,Y1), Y1=Y2+1, walkableTile(X,Y1), walkableTile(X,Y2)," << endl
+			<< "	not blocked(X,Y1), not blocked(X,Y2)." << endl
+			<< "canReach(X,Y2) :-" << endl
+			<< "	canReach(X,Y1), Y1=Y2-1, walkableTile(X,Y1), walkableTile(X,Y2)," << endl
+			<< "	not blocked(X,Y1), not blocked(X,Y2)." << endl
+			<< "canReach(X2,Y2) :-" << endl
+			<< "	canReach(X1,Y1), X1=X2+1, Y1=Y2+1, walkableTile(X1,Y1), walkableTile(X2,Y2)," << endl
+			<< "	not blocked(X1,Y1), not blocked(X2,Y2)." << endl
+			<< "canReach(X2,Y2) :-" << endl
+			<< "	canReach(X1,Y1), X1=X2-1, Y1=Y2+1, walkableTile(X1,Y1), walkableTile(X2,Y2)," << endl
+			<< "	not blocked(X1,Y1), not blocked(X2,Y2)." << endl
+			<< "canReach(X2,Y2) :-" << endl
+			<< "	canReach(X1,Y1), X1=X2+1, Y1=Y2-1, walkableTile(X1,Y1), walkableTile(X2,Y2)," << endl
+			<< "	not blocked(X1,Y1), not blocked(X2,Y2)." << endl
+			<< "canReach(X2,Y2) :-" << endl
+			<< "	canReach(X1,Y1), X1=X2-1, Y1=Y2-1, walkableTile(X1,Y1), walkableTile(X2,Y2)," << endl
+			<< "	not blocked(X1,Y1), not blocked(X2,Y2)." << endl	   << endl
+
+			<< "% Using gaps to reach (walk on) blocked locations." << endl
+			<< "enemyUnitX(16). enemyUnitY(16)." << endl
+			<< "canReach(X1,Y1) :- horizontalGap(X1,Y1,X2,Y1,G), G >= S, X2=X1+1, canReach(X1,Y3), Y3=Y1+1, enemyUnitX(S)." << endl
+			<< "canReach(X1,Y1) :- horizontalGap(X1,Y1,X2,Y1,G), G >= S, X2=X1-1, canReach(X1,Y3), Y3=Y1+1, enemyUnitX(S)." << endl
+			<< "canReach(X1,Y1) :- horizontalGap(X1,Y1,X2,Y1,G), G >= S, X2=X1+1, canReach(X1,Y3), Y3=Y1-1, enemyUnitX(S)." << endl
+			<< "canReach(X1,Y1) :- horizontalGap(X1,Y1,X2,Y1,G), G >= S, X2=X1-1, canReach(X1,Y3), Y3=Y1-1, enemyUnitX(S)." << endl
+			<< "canReach(X1,Y1) :- verticalGap(X1,Y1,X1,Y2,G), G >= S, Y2=Y1+1, canReach(X3,Y1), X3=X1-1, enemyUnitY(S)." << endl
+			<< "canReach(X1,Y1) :- verticalGap(X1,Y1,X1,Y2,G), G >= S, Y2=Y1-1, canReach(X3,Y1), X3=X1-1, enemyUnitY(S)." << endl
+			<< "canReach(X1,Y1) :- verticalGap(X1,Y1,X1,Y2,G), G >= S, Y2=Y1+1, canReach(X3,Y1), X3=X1+1, enemyUnitY(S)." << endl
+			<< "canReach(X1,Y1) :- verticalGap(X1,Y1,X1,Y2,G), G >= S, Y2=Y1-1, canReach(X3,Y1), X3=X1+1, enemyUnitY(S).	" << endl
+			<< "	" << endl
+			<< "	" << endl
+			<< "% Generate all the potential placements." << endl
+			<< "%1[place(marine1,X,Y) : buildable(marineType,X,Y)]1." << endl
+			<< "1[place(supplyDepot1,X,Y) : buildable(supplyDepotType,X,Y)]1." << endl
+			<< "1[place(supplyDepot2,X,Y) : buildable(supplyDepotType,X,Y)]1." << endl
+			<< "1[place(barracks1,X,Y) : buildable(barracksType,X,Y)]1." << endl
+
+
+
+			<< "% Optimization criterion" << endl
+			<< "#minimize [verticalGap(X1,Y1,X2,Y2,G) = G ]." << endl
+			<< "#minimize [horizontalGap(X1,Y1,X2,Y2,G) = G ]." << endl	 << endl
+
+			<< "#hide." << endl
+			<< "#show place/3." << endl
+			<< "%#show walkableTile/2." << endl;
+
+
+
+			BWAPI::Broodwar->printf("ASP Solver Contents Ready!");
+
+		file.close();
+	}
+	else											  
+		BWAPI::Broodwar->printf("Error Opening File");
+
+	
+
+}
+void runASPSolver(){
+	// relative path doesn't work. Don't know why..
+	system("D:/SCAI/IT_WORKS/BWAPI/ITUBot/Clingo/clingo.exe D:/SCAI/IT_WORKS/StarCraft/bwapi-data/AI/ITUBotWall.txt > D:/SCAI/IT_WORKS/StarCraft/bwapi-data/AI/out.txt");
+	//system("../BWAPI/ITUBot/Clingo/clingo.exe bwapi-data/AI/ITUBotWall.txt > bwapi-data/AI/solver-out.txt");
+}											
