@@ -449,6 +449,8 @@ void analyzeChoke(){
 					//Broodwar->drawBox(CoordinateType::Map, i*32, j*32, 32*(i+1), 32*(j+1), Colors::Cyan, false);	
 				
 			}
+			if( Broodwar->isWalkable(i*BTSize/WTSize , j*BTSize/WTSize) )
+				walkableTiles.push_back( std::make_pair(i, j) );
 			  
 		}  
 	}
@@ -667,6 +669,14 @@ void ITUBot::drawChokeData(){
 			Broodwar->drawBoxMap(x*BTSize , y*BTSize, (x+1)*BTSize, (y+1)*BTSize, Colors::Cyan, false);
 			Broodwar->drawTextMap(x*BTSize, y*BTSize, "%d,\n%d", x, y);
 		}
+
+		// draw walkable tiles
+		for(unsigned i = 0; i < walkableTiles.size() ; ++i){
+			int x = walkableTiles[i].first;
+			int y = walkableTiles[i].second;
+			Broodwar->drawBoxMap(x*BTSize , y*BTSize, (x+1)*BTSize, (y+1)*BTSize, Colors::Purple, false);
+			Broodwar->drawTextMap(x*BTSize, y*BTSize, "%d,\n%d", x, y);
+		}
 		int x,y;
 
 		x = insideBase.first; y = insideBase.second;
@@ -869,6 +879,219 @@ void ITUBot::executeBuildOrder(Unit* unit){
 
 }
 
+void ITUBot::initClingoProgramSource(){
+	std::ofstream file;
+
+	file.open("bwapi-data/AI/ITUBotWall.txt");
+	if(file.is_open()){
+
+		file << "% Building / Unit types" << endl
+			<< "buildingType(marineType).	" << endl
+			<< "buildingType(barracksType)." << endl
+			<< "buildingType(supplyDepotType).	" << endl  << endl
+
+			<< "% Size specifications" << endl
+			<< "width(marineType,1).	height(marineType,1)." << endl
+			<< "width(barracksType,4).	height(barracksType,3)." << endl
+			<< "width(supplyDepotType,3). 	height(supplyDepotType,2)." << endl	 << endl
+
+			<< "% Gaps" << endl
+			<< "leftGap(barracksType,16). 	rightGap(barracksType,15).	topGap(barracksType,16). 	bottomGap(barracksType,7)." << endl
+			<< "leftGap(marineType,0). 		rightGap(marineType,0). 	topGap(marineType,0). 		bottomGap(marineType,0)." << endl
+			<< "leftGap(supplyDepotType,12).		 rightGap(supplyDepotType,11). 	topGap(supplyDepotType,8). 		bottomGap(supplyDepotType,11)." << endl	 << endl
+
+			<< "% Facts" << endl
+			<< "building(marine1).	type(marine1, marineType)." << endl
+			<< "building(barracks1).	type(barracks1, barracksType)." << endl
+			<< "building(supplyDepot1).	type(supplyDepot1, supplyDepotType)." << endl
+			<< "building(supplyDepot2).	type(supplyDepot2, supplyDepotType)." << endl   << endl
+
+			<< "% Constraint: two units/buildings cannot occupy the same tile" << endl
+			<< ":- occupiedBy(B1, X, Y), occupiedBy(B2, X, Y), B1 != B2." << endl	  << endl
+
+			<< "% Tiles occupied by buildings" << endl
+			<< "occupiedBy(B,X2,Y2) :- place(B, X1, Y1)," << endl
+			<< "						type(B, BT), width(BT,Z), height(BT, Q)," << endl
+			<< "						X2 >= X1, X2 < X1+Z, Y2 >= Y1, Y2 < Y1+Q," << endl
+			<< "						walkableTile(X2, Y2)." << endl
+			<< "						" << endl  << endl
+
+			<< "% Gaps between two adjacent tiles, occupied by buildings." << endl
+			<< "verticalGap(X1,Y1,X2,Y2,G) :-" << endl
+			<< "	occupiedBy(B1,X1,Y1), occupiedBy(B2,X2,Y2)," << endl
+			<< "	B1 != B2, X1=X2, Y1=Y2-1, G=S1+S2," << endl
+			<< "	type(B1,T1), type(B2,T2), bottomGap(T1,S1), topGap(T2,S2)." << endl 
+			<< "	" << endl
+			<< "verticalGap(X1,Y1,X2,Y2,G) :-" << endl
+			<< "	occupiedBy(B1,X1,Y1), occupiedBy(B2,X2,Y2)," << endl
+			<< "	B1 != B2, X1=X2, Y1=Y2+1, G=S1+S2," << endl
+			<< "	type(B1,T1), type(B2,T2), bottomGap(T2,S2), topGap(T1,S1)." << endl
+			<< "	" << endl
+			<< "horizontalGap(X1,Y1,X2,Y2,G) :-" << endl
+			<< "	occupiedBy(B1,X1,Y1), occupiedBy(B2,X2,Y2)," << endl
+			<< "	B1 != B2, X1=X2-1, Y1=Y2, G=S1+S2," << endl
+			<< "	type(B1,T1), type(B2,T2), rightGap(T1,S1), leftGap(T2,S2)." << endl		 << endl
+
+			<< "horizontalGap(X1,Y1,X2,Y2,G) :-" << endl
+			<< "	occupiedBy(B1,X1,Y1), occupiedBy(B2,X2,Y2)," << endl
+			<< "	B1 != B2, X1=X2+1, Y1=Y2, G=S1+S2," << endl
+			<< "	type(B1,T1), type(B2,T2), rightGap(T2,S2), leftGap(T1,S1)." << endl<< endl
+
+
+			///////////////
+			<< "% Tile information" << endl;
+
+			for(std::vector<std::pair<int, int> >::const_iterator it = walkableTiles.begin();
+				it != walkableTiles.end(); ++it){
+				file << "walkableTile(" << it->first << ", " << it->second << ")." << endl;
+			}
+
+			for(std::vector<std::pair<int, int> >::const_iterator it = barracksTiles.begin();
+				it != barracksTiles.end(); ++it){
+				file << "buildable(barracksType, " << it->first << ", " << it->second << ")." << endl;
+			}
+
+			for(std::vector<std::pair<int, int> >::const_iterator it = supplyTiles.begin();
+				it != supplyTiles.end(); ++it){
+				file << "buildable(supplyDepotType, " << it->first << ", " << it->second << ")." << endl;
+			}
+			////////////////////////
+
+			insideBase = findClosestTile(buildTiles);
+			outsideBase = findFarthestTile(outsideTiles);
+			file << endl << "insideBase(" << insideBase.first << ", " << insideBase.second << ").\t";
+			file << "outsideBase(" << outsideBase.first << ", " << outsideBase.second << ")." << endl << endl
+
+
+			<< "% Constraint: Inside of the base must not be reachable." << endl
+			<< ":- insideBase(X2,Y2), outsideBase(X1,Y1), canReach(X2,Y2)." << endl	<< endl
+
+			<< "% Reachability between tiles." << endl
+			<< "blocked(X,Y) :- occupiedBy(B,X,Y), building(B), walkableTile(X,Y)." << endl
+			<< "canReach(X,Y) :- outsideBase(X,Y)." << endl	 << endl
+
+			<< "canReach(X2,Y) :-" << endl
+			<< "	canReach(X1,Y), X1=X2+1, walkableTile(X1,Y), walkableTile(X2,Y)," << endl
+			<< "	not blocked(X1,Y), not blocked(X2,Y)." << endl
+			<< "canReach(X2,Y) :-" << endl
+			<< "	canReach(X1,Y), X1=X2-1, walkableTile(X1,Y), walkableTile(X2,Y)," << endl
+			<< "	not blocked(X1,Y), not blocked(X2,Y)." << endl
+			<< "canReach(X,Y2) :-" << endl
+			<< "	canReach(X,Y1), Y1=Y2+1, walkableTile(X,Y1), walkableTile(X,Y2)," << endl
+			<< "	not blocked(X,Y1), not blocked(X,Y2)." << endl
+			<< "canReach(X,Y2) :-" << endl
+			<< "	canReach(X,Y1), Y1=Y2-1, walkableTile(X,Y1), walkableTile(X,Y2)," << endl
+			<< "	not blocked(X,Y1), not blocked(X,Y2)." << endl
+			<< "canReach(X2,Y2) :-" << endl
+			<< "	canReach(X1,Y1), X1=X2+1, Y1=Y2+1, walkableTile(X1,Y1), walkableTile(X2,Y2)," << endl
+			<< "	not blocked(X1,Y1), not blocked(X2,Y2)." << endl
+			<< "canReach(X2,Y2) :-" << endl
+			<< "	canReach(X1,Y1), X1=X2-1, Y1=Y2+1, walkableTile(X1,Y1), walkableTile(X2,Y2)," << endl
+			<< "	not blocked(X1,Y1), not blocked(X2,Y2)." << endl
+			<< "canReach(X2,Y2) :-" << endl
+			<< "	canReach(X1,Y1), X1=X2+1, Y1=Y2-1, walkableTile(X1,Y1), walkableTile(X2,Y2)," << endl
+			<< "	not blocked(X1,Y1), not blocked(X2,Y2)." << endl
+			<< "canReach(X2,Y2) :-" << endl
+			<< "	canReach(X1,Y1), X1=X2-1, Y1=Y2-1, walkableTile(X1,Y1), walkableTile(X2,Y2)," << endl
+			<< "	not blocked(X1,Y1), not blocked(X2,Y2)." << endl	   << endl
+
+			<< "% Using gaps to reach (walk on) blocked locations." << endl
+			<< "enemyUnitX(16). enemyUnitY(16)." << endl
+			<< "canReach(X1,Y1) :- horizontalGap(X1,Y1,X2,Y1,G), G >= S, X2=X1+1, canReach(X1,Y3), Y3=Y1+1, enemyUnitX(S)." << endl
+			<< "canReach(X1,Y1) :- horizontalGap(X1,Y1,X2,Y1,G), G >= S, X2=X1-1, canReach(X1,Y3), Y3=Y1+1, enemyUnitX(S)." << endl
+			<< "canReach(X1,Y1) :- horizontalGap(X1,Y1,X2,Y1,G), G >= S, X2=X1+1, canReach(X1,Y3), Y3=Y1-1, enemyUnitX(S)." << endl
+			<< "canReach(X1,Y1) :- horizontalGap(X1,Y1,X2,Y1,G), G >= S, X2=X1-1, canReach(X1,Y3), Y3=Y1-1, enemyUnitX(S)." << endl
+			<< "canReach(X1,Y1) :- verticalGap(X1,Y1,X1,Y2,G), G >= S, Y2=Y1+1, canReach(X3,Y1), X3=X1-1, enemyUnitY(S)." << endl
+			<< "canReach(X1,Y1) :- verticalGap(X1,Y1,X1,Y2,G), G >= S, Y2=Y1-1, canReach(X3,Y1), X3=X1-1, enemyUnitY(S)." << endl
+			<< "canReach(X1,Y1) :- verticalGap(X1,Y1,X1,Y2,G), G >= S, Y2=Y1+1, canReach(X3,Y1), X3=X1+1, enemyUnitY(S)." << endl
+			<< "canReach(X1,Y1) :- verticalGap(X1,Y1,X1,Y2,G), G >= S, Y2=Y1-1, canReach(X3,Y1), X3=X1+1, enemyUnitY(S).	" << endl
+			<< "	" << endl
+			<< "	" << endl
+			<< "% Generate all the potential placements." << endl
+			<< "%1[place(marine1,X,Y) : buildable(marineType,X,Y)]1." << endl
+			<< "1[place(supplyDepot1,X,Y) : buildable(supplyDepotType,X,Y)]1." << endl
+			<< "1[place(supplyDepot2,X,Y) : buildable(supplyDepotType,X,Y)]1." << endl
+			<< "1[place(barracks1,X,Y) : buildable(barracksType,X,Y)]1." << endl
+
+
+
+			<< "% Optimization criterion" << endl
+			<< "#minimize [verticalGap(X1,Y1,X2,Y2,G) = G ]." << endl
+			<< "#minimize [horizontalGap(X1,Y1,X2,Y2,G) = G ]." << endl	 << endl
+
+			<< "#hide." << endl
+			<< "#show place/3." << endl
+			<< "%#show walkableTile/2." << endl;
+
+
+
+			BWAPI::Broodwar->printf("ASP Solver Contents Ready!");
+
+		file.close();
+	}
+	else											  
+		BWAPI::Broodwar->printf("Error Opening File");
+
+	
+
+}
+void ITUBot::runASPSolver(){
+	// relative path doesn't work. Don't know why..
+	system("D:/SCAI/IT_WORKS/BWAPI/ITUBot/Clingo/clingo.exe D:/SCAI/IT_WORKS/StarCraft/bwapi-data/AI/ITUBotWall.txt > D:/SCAI/IT_WORKS/StarCraft/bwapi-data/AI/out.txt");
+	//system("../BWAPI/ITUBot/Clingo/clingo.exe bwapi-data/AI/ITUBotWall.txt > bwapi-data/AI/solver-out.txt");
+	
+	std::vector<std::string> lines;
+	std::string line;
+	unsigned lineCounter = 0;
+	std::ifstream file("D:/SCAI/IT_WORKS/StarCraft/bwapi-data/AI/out.txt");
+	if(file.is_open()){
+        while( getline(file, line) ){
+            if(*(line.end()-1) == '\r')
+                line.erase(line.end()-1);
+            lines.push_back(line);
+            if(line == "OPTIMUM FOUND"){
+                line = lines[lineCounter-2];	// to be parsed
+                break;
+            }
+            lineCounter++;
+        }
+
+		// place(supplyDepot1,119,46) place(supplyDepot2,122,44) place(barracks1,116,52) 
+		std::stringstream ss;
+		std::string token;
+        while(line != ""){
+			std::vector<int> coords;
+			UnitType type;
+			int val;
+			
+
+            ss << line.substr(6, line.find(")") - 6);
+            while(getline(ss, token, ',')){
+				std::istringstream iss(token);
+				iss >> val;
+
+				if( iss.fail() ){
+					std::size_t found = token.find("supplyDepot");
+					type =	found!=std::string::npos ? UnitTypes::Terran_Supply_Depot : UnitTypes::Terran_Barracks;
+				}
+				else{   // coordinates
+					coords.push_back(val);
+				}
+            }
+            line.erase(0, line.find(")")+2);
+            ss.clear();
+            token.clear();
+
+			wallLayout.push_back( std::make_pair(type, TilePosition(coords[0], coords[1])) );
+        }
+		ITUBot::_wall = wallLayout;
+        file.close();
+    }
+	else
+		Broodwar->printf("** ERROR OPENING SOLVER OUTPUT FILE");
+	
+
+}											
 ////////////////////////////////////
 
 void guardChoke(Unit* u){
@@ -1027,220 +1250,3 @@ std::pair<int, int> findFarthestTile(const std::vector<std::pair<int, int> >& ti
 
 	return ret;
 }
-void ITUBot::initClingoProgramSource(){
-	std::ofstream file;
-
-	file.open("bwapi-data/AI/ITUBotWall.txt");
-	if(file.is_open()){
-
-		file << "% Building / Unit types" << endl
-			<< "buildingType(marineType).	" << endl
-			<< "buildingType(barracksType)." << endl
-			<< "buildingType(supplyDepotType).	" << endl  << endl
-
-			<< "% Size specifications" << endl
-			<< "width(marineType,1).	height(marineType,1)." << endl
-			<< "width(barracksType,4).	height(barracksType,3)." << endl
-			<< "width(supplyDepotType,3). 	height(supplyDepotType,2)." << endl	 << endl
-
-			<< "% Gaps" << endl
-			<< "leftGap(barracksType,16). 	rightGap(barracksType,15).	topGap(barracksType,16). 	bottomGap(barracksType,7)." << endl
-			<< "leftGap(marineType,0). 		rightGap(marineType,0). 	topGap(marineType,0). 		bottomGap(marineType,0)." << endl
-			<< "leftGap(supplyDepotType,12).		 rightGap(supplyDepotType,11). 	topGap(supplyDepotType,8). 		bottomGap(supplyDepotType,11)." << endl	 << endl
-
-			<< "% Facts" << endl
-			<< "building(marine1).	type(marine1, marineType)." << endl
-			<< "building(barracks1).	type(barracks1, barracksType)." << endl
-			<< "building(supplyDepot1).	type(supplyDepot1, supplyDepotType)." << endl
-			<< "building(supplyDepot2).	type(supplyDepot2, supplyDepotType)." << endl   << endl
-
-			<< "% Constraint: two units/buildings cannot occupy the same tile" << endl
-			<< ":- occupiedBy(B1, X, Y), occupiedBy(B2, X, Y), B1 != B2." << endl	  << endl
-
-			<< "% Tiles occupied by buildings" << endl
-			<< "occupiedBy(B,X2,Y2) :- place(B, X1, Y1)," << endl
-			<< "						type(B, BT), width(BT,Z), height(BT, Q)," << endl
-			<< "						X2 >= X1, X2 < X1+Z, Y2 >= Y1, Y2 < Y1+Q," << endl
-			<< "						walkableTile(X2, Y2)." << endl
-			<< "						" << endl  << endl
-
-			<< "% Gaps between two adjacent tiles, occupied by buildings." << endl
-			<< "verticalGap(X1,Y1,X2,Y2,G) :-" << endl
-			<< "	occupiedBy(B1,X1,Y1), occupiedBy(B2,X2,Y2)," << endl
-			<< "	B1 != B2, X1=X2, Y1=Y2-1, G=S1+S2," << endl
-			<< "	type(B1,T1), type(B2,T2), bottomGap(T1,S1), topGap(T2,S2)." << endl 
-			<< "	" << endl
-			<< "verticalGap(X1,Y1,X2,Y2,G) :-" << endl
-			<< "	occupiedBy(B1,X1,Y1), occupiedBy(B2,X2,Y2)," << endl
-			<< "	B1 != B2, X1=X2, Y1=Y2+1, G=S1+S2," << endl
-			<< "	type(B1,T1), type(B2,T2), bottomGap(T2,S2), topGap(T1,S1)." << endl
-			<< "	" << endl
-			<< "horizontalGap(X1,Y1,X2,Y2,G) :-" << endl
-			<< "	occupiedBy(B1,X1,Y1), occupiedBy(B2,X2,Y2)," << endl
-			<< "	B1 != B2, X1=X2-1, Y1=Y2, G=S1+S2," << endl
-			<< "	type(B1,T1), type(B2,T2), rightGap(T1,S1), leftGap(T2,S2)." << endl		 << endl
-
-			<< "horizontalGap(X1,Y1,X2,Y2,G) :-" << endl
-			<< "	occupiedBy(B1,X1,Y1), occupiedBy(B2,X2,Y2)," << endl
-			<< "	B1 != B2, X1=X2+1, Y1=Y2, G=S1+S2," << endl
-			<< "	type(B1,T1), type(B2,T2), rightGap(T2,S2), leftGap(T1,S1)." << endl<< endl
-
-
-			///////////////
-			<< "% Tile information" << endl;
-
-			for(std::vector<std::pair<int, int> >::const_iterator it = buildTiles.begin();
-				it != buildTiles.end(); ++it){
-				file << "walkableTile(" << it->first << ", " << it->second << ")." << endl;
-			}
-			for(std::vector<std::pair<int, int> >::const_iterator it = outsideTiles.begin();
-				it != outsideTiles.end(); ++it){
-				file << "walkableTile(" << it->first << ", " << it->second << ")." << endl;
-			}
-
-			for(std::vector<std::pair<int, int> >::const_iterator it = barracksTiles.begin();
-				it != barracksTiles.end(); ++it){
-				file << "buildable(barracksType, " << it->first << ", " << it->second << ")." << endl;
-			}
-
-			for(std::vector<std::pair<int, int> >::const_iterator it = supplyTiles.begin();
-				it != supplyTiles.end(); ++it){
-				file << "buildable(supplyDepotType, " << it->first << ", " << it->second << ")." << endl;
-			}
-			////////////////////////
-
-			insideBase = findClosestTile(buildTiles);
-			outsideBase = findFarthestTile(outsideTiles);
-			file << endl << "insideBase(" << insideBase.first << ", " << insideBase.second << ").\t";
-			file << "outsideBase(" << outsideBase.first << ", " << outsideBase.second << ")." << endl << endl
-
-
-			<< "% Constraint: Inside of the base must not be reachable." << endl
-			<< ":- insideBase(X2,Y2), outsideBase(X1,Y1), canReach(X2,Y2)." << endl	<< endl
-
-			<< "% Reachability between tiles." << endl
-			<< "blocked(X,Y) :- occupiedBy(B,X,Y), building(B), walkableTile(X,Y)." << endl
-			<< "canReach(X,Y) :- outsideBase(X,Y)." << endl	 << endl
-
-			<< "canReach(X2,Y) :-" << endl
-			<< "	canReach(X1,Y), X1=X2+1, walkableTile(X1,Y), walkableTile(X2,Y)," << endl
-			<< "	not blocked(X1,Y), not blocked(X2,Y)." << endl
-			<< "canReach(X2,Y) :-" << endl
-			<< "	canReach(X1,Y), X1=X2-1, walkableTile(X1,Y), walkableTile(X2,Y)," << endl
-			<< "	not blocked(X1,Y), not blocked(X2,Y)." << endl
-			<< "canReach(X,Y2) :-" << endl
-			<< "	canReach(X,Y1), Y1=Y2+1, walkableTile(X,Y1), walkableTile(X,Y2)," << endl
-			<< "	not blocked(X,Y1), not blocked(X,Y2)." << endl
-			<< "canReach(X,Y2) :-" << endl
-			<< "	canReach(X,Y1), Y1=Y2-1, walkableTile(X,Y1), walkableTile(X,Y2)," << endl
-			<< "	not blocked(X,Y1), not blocked(X,Y2)." << endl
-			<< "canReach(X2,Y2) :-" << endl
-			<< "	canReach(X1,Y1), X1=X2+1, Y1=Y2+1, walkableTile(X1,Y1), walkableTile(X2,Y2)," << endl
-			<< "	not blocked(X1,Y1), not blocked(X2,Y2)." << endl
-			<< "canReach(X2,Y2) :-" << endl
-			<< "	canReach(X1,Y1), X1=X2-1, Y1=Y2+1, walkableTile(X1,Y1), walkableTile(X2,Y2)," << endl
-			<< "	not blocked(X1,Y1), not blocked(X2,Y2)." << endl
-			<< "canReach(X2,Y2) :-" << endl
-			<< "	canReach(X1,Y1), X1=X2+1, Y1=Y2-1, walkableTile(X1,Y1), walkableTile(X2,Y2)," << endl
-			<< "	not blocked(X1,Y1), not blocked(X2,Y2)." << endl
-			<< "canReach(X2,Y2) :-" << endl
-			<< "	canReach(X1,Y1), X1=X2-1, Y1=Y2-1, walkableTile(X1,Y1), walkableTile(X2,Y2)," << endl
-			<< "	not blocked(X1,Y1), not blocked(X2,Y2)." << endl	   << endl
-
-			<< "% Using gaps to reach (walk on) blocked locations." << endl
-			<< "enemyUnitX(16). enemyUnitY(16)." << endl
-			<< "canReach(X1,Y1) :- horizontalGap(X1,Y1,X2,Y1,G), G >= S, X2=X1+1, canReach(X1,Y3), Y3=Y1+1, enemyUnitX(S)." << endl
-			<< "canReach(X1,Y1) :- horizontalGap(X1,Y1,X2,Y1,G), G >= S, X2=X1-1, canReach(X1,Y3), Y3=Y1+1, enemyUnitX(S)." << endl
-			<< "canReach(X1,Y1) :- horizontalGap(X1,Y1,X2,Y1,G), G >= S, X2=X1+1, canReach(X1,Y3), Y3=Y1-1, enemyUnitX(S)." << endl
-			<< "canReach(X1,Y1) :- horizontalGap(X1,Y1,X2,Y1,G), G >= S, X2=X1-1, canReach(X1,Y3), Y3=Y1-1, enemyUnitX(S)." << endl
-			<< "canReach(X1,Y1) :- verticalGap(X1,Y1,X1,Y2,G), G >= S, Y2=Y1+1, canReach(X3,Y1), X3=X1-1, enemyUnitY(S)." << endl
-			<< "canReach(X1,Y1) :- verticalGap(X1,Y1,X1,Y2,G), G >= S, Y2=Y1-1, canReach(X3,Y1), X3=X1-1, enemyUnitY(S)." << endl
-			<< "canReach(X1,Y1) :- verticalGap(X1,Y1,X1,Y2,G), G >= S, Y2=Y1+1, canReach(X3,Y1), X3=X1+1, enemyUnitY(S)." << endl
-			<< "canReach(X1,Y1) :- verticalGap(X1,Y1,X1,Y2,G), G >= S, Y2=Y1-1, canReach(X3,Y1), X3=X1+1, enemyUnitY(S).	" << endl
-			<< "	" << endl
-			<< "	" << endl
-			<< "% Generate all the potential placements." << endl
-			<< "%1[place(marine1,X,Y) : buildable(marineType,X,Y)]1." << endl
-			<< "1[place(supplyDepot1,X,Y) : buildable(supplyDepotType,X,Y)]1." << endl
-			<< "1[place(supplyDepot2,X,Y) : buildable(supplyDepotType,X,Y)]1." << endl
-			<< "1[place(barracks1,X,Y) : buildable(barracksType,X,Y)]1." << endl
-
-
-
-			<< "% Optimization criterion" << endl
-			<< "#minimize [verticalGap(X1,Y1,X2,Y2,G) = G ]." << endl
-			<< "#minimize [horizontalGap(X1,Y1,X2,Y2,G) = G ]." << endl	 << endl
-
-			<< "#hide." << endl
-			<< "#show place/3." << endl
-			<< "%#show walkableTile/2." << endl;
-
-
-
-			BWAPI::Broodwar->printf("ASP Solver Contents Ready!");
-
-		file.close();
-	}
-	else											  
-		BWAPI::Broodwar->printf("Error Opening File");
-
-	
-
-}
-void ITUBot::runASPSolver(){
-	// relative path doesn't work. Don't know why..
-	system("D:/SCAI/IT_WORKS/BWAPI/ITUBot/Clingo/clingo.exe D:/SCAI/IT_WORKS/StarCraft/bwapi-data/AI/ITUBotWall.txt > D:/SCAI/IT_WORKS/StarCraft/bwapi-data/AI/out.txt");
-	//system("../BWAPI/ITUBot/Clingo/clingo.exe bwapi-data/AI/ITUBotWall.txt > bwapi-data/AI/solver-out.txt");
-	
-	std::vector<std::string> lines;
-	std::string line;
-	unsigned lineCounter = 0;
-	std::ifstream file("D:/SCAI/IT_WORKS/StarCraft/bwapi-data/AI/out.txt");
-	if(file.is_open()){
-        while( getline(file, line) ){
-            if(*(line.end()-1) == '\r')
-                line.erase(line.end()-1);
-            lines.push_back(line);
-            if(line == "OPTIMUM FOUND"){
-                line = lines[lineCounter-2];	// to be parsed
-                break;
-            }
-            lineCounter++;
-        }
-
-		// place(supplyDepot1,119,46) place(supplyDepot2,122,44) place(barracks1,116,52) 
-		std::stringstream ss;
-		std::string token;
-        while(line != ""){
-			std::vector<int> coords;
-			UnitType type;
-			int val;
-			
-
-            ss << line.substr(6, line.find(")") - 6);
-            while(getline(ss, token, ',')){
-				std::istringstream iss(token);
-				iss >> val;
-
-				if( iss.fail() ){
-					std::size_t found = token.find("supplyDepot");
-					type =	found!=std::string::npos ? UnitTypes::Terran_Supply_Depot : UnitTypes::Terran_Barracks;
-				}
-				else{   // coordinates
-					coords.push_back(val);
-				}
-            }
-            line.erase(0, line.find(")")+2);
-            ss.clear();
-            token.clear();
-
-			wallLayout.push_back( std::make_pair(type, TilePosition(coords[0], coords[1])) );
-        }
-		ITUBot::_wall = wallLayout;
-        file.close();
-    }
-	else
-		Broodwar->printf("** ERROR OPENING SOLVER OUTPUT FILE");
-	
-
-}											
