@@ -45,10 +45,16 @@ public:
 	bool show_visibility_data;
 
 	// build order functions
-	std::queue<BWAPI::UnitType>& buildOrder() { return _buildOrder; }
+	std::queue<BWAPI::UnitType>& buildOrder()  { return _buildOrder; }
 	void populateBuildOrder();
 	void executeBuildOrder(BWAPI::Unit* unit);
 
+	// wall functions
+	std::vector<std::pair<BWAPI::UnitType, BWAPI::TilePosition> >& wall() { return _wall; }
+	static void initClingoProgramSource();
+	static void runASPSolver();
+
 private:
 	std::queue<BWAPI::UnitType> _buildOrder;
+	static std::vector<std::pair<BWAPI::UnitType, BWAPI::TilePosition> > _wall;
 };

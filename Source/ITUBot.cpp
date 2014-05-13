@@ -4,8 +4,11 @@
 #include <cstdlib>
 #include <iostream>	
 #include <fstream>
+#include <string>
+#include <sstream>
 
 #include <errno.h>
+#include <cctype>
 
 using namespace BWAPI;
 using std::endl;
@@ -30,6 +33,10 @@ std::vector<std::pair<int, int> > walkableTiles;
 std::vector<std::pair<int, int> > outsideTiles;	  
 std::pair<int, int> insideBase, outsideBase;
 
+std::vector<std::pair<UnitType, TilePosition> > wallLayout;
+bool wallData = true;
+std::vector<std::pair<BWAPI::UnitType, BWAPI::TilePosition> > ITUBot::_wall;
+
 
 // Drawing variables  (to be changed later)
 UnitType drawWhat;
@@ -52,8 +59,6 @@ void guardChoke(Unit*);
 void back2work(Unit*);
 TilePosition getBuildTile(Unit* u, UnitType b, Position p, bool shrink = false);
 Unit* pickBuilder();
-void initClingoProgramSource();
-void runASPSolver();
 std::pair<int, int> findClosestTile(const std::vector<std::pair<int, int> >& tiles);
 std::pair<int, int> findFarthestTile(const std::vector<std::pair<int, int> >& tiles);
 
@@ -254,7 +259,7 @@ void ITUBot::onSendText(std::string text)
 		show_visibility_data=!show_visibility_data;
 	} else if (text=="/ASP")
 	{
-		runASPSolver();
+		wallData = !wallData;
 	} else
 	{
 		Broodwar->printf("You typed '%s'!",text.c_str());
@@ -317,6 +322,14 @@ void ITUBot::onUnitCreate(BWAPI::Unit* unit)
 					builder = NULL;
 					Broodwar->printf("%s completed. Build order remaining size: %d", _buildOrder.front().getName().c_str(), _buildOrder.size()-1);
 					_buildOrder.pop();
+					// find in _wall
+					bool found = false;
+					for(unsigned i=0; i< ITUBot::_wall.size() ; ++i){
+						if( ITUBot::_wall[i].first == unit->getType() ){
+							ITUBot::_wall.erase( ITUBot::_wall.begin() + i );
+							break;
+						}
+					}
 				}
 			}
 
@@ -489,9 +502,9 @@ DWORD WINAPI AnalyzeThread(){
 		}
 	}
 
-	analyzeChoke();
-	initClingoProgramSource();
-	runASPSolver();
+	analyzeChoke();	   
+	ITUBot::initClingoProgramSource();
+	ITUBot::runASPSolver();
 
 	return 0;
 }
@@ -624,60 +637,71 @@ void ITUBot::drawTerrainData(){
 
 void ITUBot::drawChokeData(){
 	
-	// draw buildable tiles
-	for(unsigned i = 0; i < buildTiles.size() ; ++i){
-		int x = buildTiles[i].first;
-		int y = buildTiles[i].second;
-		Broodwar->drawBoxMap(x*BTSize , y*BTSize, (x+1)*BTSize, (y+1)*BTSize, Colors::Green, false);
-		Broodwar->drawTextMap(x*BTSize, y*BTSize, "%d,\n%d", x, y);
-	}
-	
-	 // draw possible supply depot tiles
-	for(unsigned i = 0; i < supplyTiles.size() ; ++i){
-		int x = supplyTiles[i].first;
-		int y = supplyTiles[i].second;
-		Broodwar->drawBoxMap(x*BTSize+5 , y*BTSize+5, (x+1)*BTSize-5, (y+1)*BTSize-5, Colors::Red, false);
-	}
-	
-	// draw possible barracks tiles
-	for(unsigned i = 0; i < barracksTiles.size() ; ++i){
-		int x = barracksTiles[i].first;
-		int y = barracksTiles[i].second;
-		Broodwar->drawBoxMap(x*BTSize+8 , y*BTSize+8, (x+1)*BTSize-8, (y+1)*BTSize-8, Colors::Blue, false);
-	}
+	if( !wallData){
+		// draw buildable tiles
+		for(unsigned i = 0; i < buildTiles.size() ; ++i){
+			int x = buildTiles[i].first;
+			int y = buildTiles[i].second;
+			Broodwar->drawBoxMap(x*BTSize , y*BTSize, (x+1)*BTSize, (y+1)*BTSize, Colors::Green, false);
+			Broodwar->drawTextMap(x*BTSize, y*BTSize, "%d,\n%d", x, y);
+		}
+		
+		 // draw possible supply depot tiles
+		for(unsigned i = 0; i < supplyTiles.size() ; ++i){
+			int x = supplyTiles[i].first;
+			int y = supplyTiles[i].second;
+			Broodwar->drawBoxMap(x*BTSize+5 , y*BTSize+5, (x+1)*BTSize-5, (y+1)*BTSize-5, Colors::Red, false);
+		}
+		
+		// draw possible barracks tiles
+		for(unsigned i = 0; i < barracksTiles.size() ; ++i){
+			int x = barracksTiles[i].first;
+			int y = barracksTiles[i].second;
+			Broodwar->drawBoxMap(x*BTSize+8 , y*BTSize+8, (x+1)*BTSize-8, (y+1)*BTSize-8, Colors::Blue, false);
+		}
 
-	// draw buildable tiles
-	for(unsigned i = 0; i < outsideTiles.size() ; ++i){
-		int x = outsideTiles[i].first;
-		int y = outsideTiles[i].second;
-		Broodwar->drawBoxMap(x*BTSize , y*BTSize, (x+1)*BTSize, (y+1)*BTSize, Colors::Cyan, false);
-		Broodwar->drawTextMap(x*BTSize, y*BTSize, "%d,\n%d", x, y);
+		// draw buildable tiles
+		for(unsigned i = 0; i < outsideTiles.size() ; ++i){
+			int x = outsideTiles[i].first;
+			int y = outsideTiles[i].second;
+			Broodwar->drawBoxMap(x*BTSize , y*BTSize, (x+1)*BTSize, (y+1)*BTSize, Colors::Cyan, false);
+			Broodwar->drawTextMap(x*BTSize, y*BTSize, "%d,\n%d", x, y);
+		}
+		int x,y;
+
+		x = insideBase.first; y = insideBase.second;
+		Broodwar->drawBoxMap(x*BTSize , y*BTSize, (x+1)*BTSize, (y+1)*BTSize, Colors::Green, true);
+
+		x = outsideBase.first; y = outsideBase.second;
+		Broodwar->drawBoxMap(x*BTSize , y*BTSize, (x+1)*BTSize, (y+1)*BTSize, Colors::Cyan, true);
+
+		/*
+		// walk tile analysis
+		tileX = x/WTSize;	tileY = y/WTSize;	maxDist *= BTSize/WTSize;
+		for (int i = tileX - maxDist ; i <= tileX + maxDist ; ++i){
+			for(int j = tileY - maxDist ; j <= tileY + maxDist ; ++j){
+				
+				if( Broodwar->isWalkable( i,j ) ){
+					//Broodwar->drawBoxMap(i*WTSize, j*WTSize, WTSize*(i+1), WTSize*(j+1), Colors::Blue, false);
+					//Broodwar->drawTextMap(i*WTSize, j*WTSize, "\x11%d, %d", i, j);  
+					Broodwar->drawCircleMap(i*WTSize, j*WTSize, 1, Colors::Orange, false);
+				}
+
+				
+				  
+			}  
+		}
+		*/
 	}
-	int x,y;
-
-	x = insideBase.first; y = insideBase.second;
-	Broodwar->drawBoxMap(x*BTSize , y*BTSize, (x+1)*BTSize, (y+1)*BTSize, Colors::Green, true);
-
-	x = outsideBase.first; y = outsideBase.second;
-	Broodwar->drawBoxMap(x*BTSize , y*BTSize, (x+1)*BTSize, (y+1)*BTSize, Colors::Cyan, true);
-
-	/*
-	// walk tile analysis
-	tileX = x/WTSize;	tileY = y/WTSize;	maxDist *= BTSize/WTSize;
-	for (int i = tileX - maxDist ; i <= tileX + maxDist ; ++i){
-		for(int j = tileY - maxDist ; j <= tileY + maxDist ; ++j){
-			
-			if( Broodwar->isWalkable( i,j ) ){
-				//Broodwar->drawBoxMap(i*WTSize, j*WTSize, WTSize*(i+1), WTSize*(j+1), Colors::Blue, false);
-				//Broodwar->drawTextMap(i*WTSize, j*WTSize, "\x11%d, %d", i, j);  
-				Broodwar->drawCircleMap(i*WTSize, j*WTSize, 1, Colors::Orange, false);
-			}
-
-			
-			  
-		}  
+	else{
+		for(unsigned i = 0; i < wallLayout.size() ; ++i){
+			int x = wallLayout[i].second.x();
+			int y = wallLayout[i].second.y();
+			int h = wallLayout[i].first.tileHeight();
+			int w = wallLayout[i].first.tileWidth();
+			Broodwar->drawBoxMap(x*BTSize, y*BTSize, (x+w)*BTSize, (y+h)*BTSize, Colors::Orange, false);
+		}
 	}
-	*/
 }
 
 /////
@@ -743,8 +767,21 @@ void ITUBot::executeBuildOrder(Unit* unit){
 
 			// find a suitable location if the builder is not assigned to work yet		
 			TilePosition targetBuildLocation(-1, -1);	// invalid location by default
+
 			if(builder == NULL || FoWError == true ){
-				targetBuildLocation = getBuildTile(unit, toBuild, home->getCenter());
+				
+				// find in _wall
+				bool found = false;
+				for(unsigned i=0; i< ITUBot::_wall.size() ; ++i){
+					if( ITUBot::_wall[i].first == toBuild ){
+						found = true;
+						targetBuildLocation = ITUBot::_wall[i].second;
+						break;
+					}
+				}
+
+				if(found == false)
+					targetBuildLocation = getBuildTile(unit, toBuild, home->getCenter());
 				bLastChecked = Broodwar->getFrameCount();
 			}
 
@@ -990,7 +1027,7 @@ std::pair<int, int> findFarthestTile(const std::vector<std::pair<int, int> >& ti
 
 	return ret;
 }
-void initClingoProgramSource(){
+void ITUBot::initClingoProgramSource(){
 	std::ofstream file;
 
 	file.open("bwapi-data/AI/ITUBotWall.txt");
@@ -1150,8 +1187,60 @@ void initClingoProgramSource(){
 	
 
 }
-void runASPSolver(){
+void ITUBot::runASPSolver(){
 	// relative path doesn't work. Don't know why..
 	system("D:/SCAI/IT_WORKS/BWAPI/ITUBot/Clingo/clingo.exe D:/SCAI/IT_WORKS/StarCraft/bwapi-data/AI/ITUBotWall.txt > D:/SCAI/IT_WORKS/StarCraft/bwapi-data/AI/out.txt");
 	//system("../BWAPI/ITUBot/Clingo/clingo.exe bwapi-data/AI/ITUBotWall.txt > bwapi-data/AI/solver-out.txt");
+	
+	std::vector<std::string> lines;
+	std::string line;
+	unsigned lineCounter = 0;
+	std::ifstream file("D:/SCAI/IT_WORKS/StarCraft/bwapi-data/AI/out.txt");
+	if(file.is_open()){
+        while( getline(file, line) ){
+            if(*(line.end()-1) == '\r')
+                line.erase(line.end()-1);
+            lines.push_back(line);
+            if(line == "OPTIMUM FOUND"){
+                line = lines[lineCounter-2];	// to be parsed
+                break;
+            }
+            lineCounter++;
+        }
+
+		// place(supplyDepot1,119,46) place(supplyDepot2,122,44) place(barracks1,116,52) 
+		std::stringstream ss;
+		std::string token;
+        while(line != ""){
+			std::vector<int> coords;
+			UnitType type;
+			int val;
+			
+
+            ss << line.substr(6, line.find(")") - 6);
+            while(getline(ss, token, ',')){
+				std::istringstream iss(token);
+				iss >> val;
+
+				if( iss.fail() ){
+					std::size_t found = token.find("supplyDepot");
+					type =	found!=std::string::npos ? UnitTypes::Terran_Supply_Depot : UnitTypes::Terran_Barracks;
+				}
+				else{   // coordinates
+					coords.push_back(val);
+				}
+            }
+            line.erase(0, line.find(")")+2);
+            ss.clear();
+            token.clear();
+
+			wallLayout.push_back( std::make_pair(type, TilePosition(coords[0], coords[1])) );
+        }
+		ITUBot::_wall = wallLayout;
+        file.close();
+    }
+	else
+		Broodwar->printf("** ERROR OPENING SOLVER OUTPUT FILE");
+	
+
 }											
