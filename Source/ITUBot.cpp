@@ -428,7 +428,7 @@ void analyzeChoke(){
 
  	// choke point analysis
 	int x =	choke->getCenter().x(); int y = choke->getCenter().y();
-	int maxDist = 10;				
+	int maxDist = 7;				
 	int tileX = x/BTSize;			int tileY = y/BTSize;
 
 	// analysis of build tiles near choke points
@@ -487,10 +487,6 @@ DWORD WINAPI AnalyzeThread(){
 	if (BWTA::getStartLocation(BWAPI::Broodwar->enemy())!=NULL)
 		enemy_base = BWTA::getStartLocation(BWAPI::Broodwar->enemy())->getRegion();
 	
-	analyzed   = true;
-	analysis_just_finished = true;
-	BWAPI::Broodwar->printf("Finished analyzing map.");
-	
 	// assign the closest choke point
 	std::set<BWTA::Chokepoint*> chokepoints= home->getChokepoints();
 	double min_length=10000;
@@ -507,7 +503,10 @@ DWORD WINAPI AnalyzeThread(){
 	analyzeChoke();	   
 	ITUBot::initClingoProgramSource();
 	ITUBot::runASPSolver();
-
+	
+	analyzed   = true;
+	analysis_just_finished = true;
+	BWAPI::Broodwar->printf("Finished analyzing map.");
 	return 0;
 }
 
@@ -904,7 +903,8 @@ void ITUBot::initClingoProgramSource(){
 			<< "building(marine1).	type(marine1, marineType)." << endl
 			<< "building(barracks1).	type(barracks1, barracksType)." << endl
 			<< "building(supplyDepot1).	type(supplyDepot1, supplyDepotType)." << endl
-			<< "building(supplyDepot2).	type(supplyDepot2, supplyDepotType)." << endl   << endl
+			<< "building(supplyDepot2).	type(supplyDepot2, supplyDepotType)." << endl   
+			<< "building(supplyDepot3).	type(supplyDepot3, supplyDepotType)." << endl << endl
 
 			<< "% Constraint: two units/buildings cannot occupy the same tile" << endl
 			<< ":- occupiedBy(B1, X, Y), occupiedBy(B2, X, Y), B1 != B2." << endl	  << endl
@@ -996,7 +996,7 @@ void ITUBot::initClingoProgramSource(){
 			<< "	not blocked(X1,Y1), not blocked(X2,Y2)." << endl	   << endl
 
 			<< "% Using gaps to reach (walk on) blocked locations." << endl
-			<< "enemyUnitX(16). enemyUnitY(16)." << endl
+			<< "enemyUnitX(32). enemyUnitY(32)." << endl
 			<< "canReach(X1,Y1) :- horizontalGap(X1,Y1,X2,Y1,G), G >= S, X2=X1+1, canReach(X1,Y3), Y3=Y1+1, enemyUnitX(S)." << endl
 			<< "canReach(X1,Y1) :- horizontalGap(X1,Y1,X2,Y1,G), G >= S, X2=X1-1, canReach(X1,Y3), Y3=Y1+1, enemyUnitX(S)." << endl
 			<< "canReach(X1,Y1) :- horizontalGap(X1,Y1,X2,Y1,G), G >= S, X2=X1+1, canReach(X1,Y3), Y3=Y1-1, enemyUnitX(S)." << endl
@@ -1011,6 +1011,7 @@ void ITUBot::initClingoProgramSource(){
 			<< "%1[place(marine1,X,Y) : buildable(marineType,X,Y)]1." << endl
 			<< "1[place(supplyDepot1,X,Y) : buildable(supplyDepotType,X,Y)]1." << endl
 			<< "1[place(supplyDepot2,X,Y) : buildable(supplyDepotType,X,Y)]1." << endl
+			<< "1[place(supplyDepot3,X,Y) : buildable(supplyDepotType,X,Y)]1." << endl
 			<< "1[place(barracks1,X,Y) : buildable(barracksType,X,Y)]1." << endl
 
 
@@ -1020,8 +1021,7 @@ void ITUBot::initClingoProgramSource(){
 			<< "#minimize [horizontalGap(X1,Y1,X2,Y2,G) = G ]." << endl	 << endl
 
 			<< "#hide." << endl
-			<< "#show place/3." << endl
-			<< "%#show walkableTile/2." << endl;
+			<< "#show place/3." << endl;
 
 
 
@@ -1219,8 +1219,8 @@ std::pair<int, int> findClosestTile(const std::vector<std::pair<int, int> >& til
 	double dist = 9000000000;
 
 	for(std::vector<std::pair<int, int> >::const_iterator it = tiles.begin() ; it != tiles.end() ; ++it){
-		if(p.getDistance( Position(it->first, it->second) ) <= dist){
-			dist =	p.getDistance( Position(it->first, it->second) );
+		if(p.getDistance( Position(it->first*BTSize, it->second*BTSize) ) <= dist){
+			dist =	p.getDistance( Position(it->first*BTSize, it->second*BTSize) );
 			ret = *it;
 		}
 	}
@@ -1242,8 +1242,8 @@ std::pair<int, int> findFarthestTile(const std::vector<std::pair<int, int> >& ti
 	double dist = 0;
 
 	for(std::vector<std::pair<int, int> >::const_iterator it = tiles.begin() ; it != tiles.end() ; ++it){
-		if(p.getDistance( Position(it->first, it->second) ) >= dist){
-			dist =	p.getDistance( Position(it->first, it->second) );
+		if(p.getDistance( Position(it->first*BTSize, it->second*BTSize) ) >= dist){
+			dist =	p.getDistance( Position(it->first*BTSize, it->second*BTSize) );
 			ret = *it;
 		}
 	}
