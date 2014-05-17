@@ -449,11 +449,19 @@ void analyzeChoke(){
 					//Broodwar->drawBox(CoordinateType::Map, i*32, j*32, 32*(i+1), 32*(j+1), Colors::Cyan, false);	
 				
 			}
-			if( Broodwar->isWalkable(i*BTSize/WTSize , j*BTSize/WTSize) )
-				walkableTiles.push_back( std::make_pair(i, j) );
+			
 			  
 		}  
 	}
+
+	maxDist += 10;
+	for (int i = tileX - maxDist ; i <= tileX + maxDist ; ++i){
+		for(int j = tileY - maxDist ; j <= tileY + maxDist ; ++j){
+			if( Broodwar->isWalkable(i*BTSize/WTSize , j*BTSize/WTSize) )
+				walkableTiles.push_back( std::make_pair(i, j) );
+		}
+	}
+
 
 	Unit* builderr = NULL;
 	builderr = pickBuilder();
@@ -770,7 +778,7 @@ void ITUBot::executeBuildOrder(Unit* unit){
 		// if the map analysis is done
 		if(unit->getType().isWorker() && !unit->isConstructing() && unit->isCarryingMinerals() &&
 			Broodwar->self()->minerals() >= toBuild.mineralPrice() &&
-			home != NULL
+			home != NULL && analyzed == true
 			)
 		{
 
@@ -1008,10 +1016,10 @@ void ITUBot::initClingoProgramSource(){
 			<< "	" << endl
 			<< "	" << endl
 			<< "% Generate all the potential placements." << endl
-			<< "%1[place(marine1,X,Y) : buildable(marineType,X,Y)]1." << endl
+			<< "%1[place(marine1,X,Y) : buildable(marineType,X,Y)]1." << endl				// commented out
 			<< "1[place(supplyDepot1,X,Y) : buildable(supplyDepotType,X,Y)]1." << endl
 			<< "1[place(supplyDepot2,X,Y) : buildable(supplyDepotType,X,Y)]1." << endl
-			<< "1[place(supplyDepot3,X,Y) : buildable(supplyDepotType,X,Y)]1." << endl
+			<< "%1[place(supplyDepot3,X,Y) : buildable(supplyDepotType,X,Y)]1." << endl	    // commented out
 			<< "1[place(barracks1,X,Y) : buildable(barracksType,X,Y)]1." << endl
 
 
@@ -1053,6 +1061,10 @@ void ITUBot::runASPSolver(){
                 line = lines[lineCounter-2];	// to be parsed
                 break;
             }
+			if(line == "UNSATISFIABLE"){
+				Broodwar->printf("Solver failed finding a solution!");
+				return;
+			}
             lineCounter++;
         }
 
@@ -1215,16 +1227,18 @@ std::pair<int, int> findClosestTile(const std::vector<std::pair<int, int> >& til
 			break;
 		}
 	}
-
+	
 	double dist = 9000000000;
 
-	for(std::vector<std::pair<int, int> >::const_iterator it = tiles.begin() ; it != tiles.end() ; ++it){
+	for(std::vector<std::pair<int, int> >::const_iterator it = walkableTiles.begin() ; it != walkableTiles.end() ; ++it){
 		if(p.getDistance( Position(it->first*BTSize, it->second*BTSize) ) <= dist){
 			dist =	p.getDistance( Position(it->first*BTSize, it->second*BTSize) );
 			ret = *it;
 		}
-	}
+	}   
 
+	//ret.first = p.x()/BTSize; 
+	//ret.second = p.y()/BTSize;
 	return ret;
 }
 
