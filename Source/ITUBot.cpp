@@ -294,7 +294,7 @@ void ITUBot::onUnitDiscover(BWAPI::Unit* unit)
 void ITUBot::onUnitEvade(BWAPI::Unit* unit)
 {
   if (!Broodwar->isReplay() && Broodwar->getFrameCount()>1)
-    Broodwar->sendText("A %s [%x] was last accessible at (%d,%d)",unit->getType().getName().c_str(),unit,unit->getPosition().x(),unit->getPosition().y());
+    ;//Broodwar->sendText("A %s [%x] was last accessible at (%d,%d)",unit->getType().getName().c_str(),unit,unit->getPosition().x(),unit->getPosition().y());
 }
 
 void ITUBot::onUnitShow(BWAPI::Unit* unit)
@@ -306,7 +306,7 @@ void ITUBot::onUnitShow(BWAPI::Unit* unit)
 void ITUBot::onUnitHide(BWAPI::Unit* unit)
 {
   if (!Broodwar->isReplay() && Broodwar->getFrameCount()>1)
-    Broodwar->sendText("A %s [%x] was last seen at (%d,%d)",unit->getType().getName().c_str(),unit,unit->getPosition().x(),unit->getPosition().y());
+   ;// Broodwar->sendText("A %s [%x] was last seen at (%d,%d)",unit->getType().getName().c_str(),unit,unit->getPosition().x(),unit->getPosition().y());
 }
 
 void ITUBot::onUnitCreate(BWAPI::Unit* unit)
@@ -314,9 +314,9 @@ void ITUBot::onUnitCreate(BWAPI::Unit* unit)
 	if (Broodwar->getFrameCount()>1)
 	{
 		if (!Broodwar->isReplay()){
-			Broodwar->sendText("A %s [%x] has been created at (%d,%d)=(%d,%d)",unit->getType().getName().c_str(),unit,
-																				unit->getPosition().x(),unit->getPosition().y(),
-																				unit->getPosition().x()/32,unit->getPosition().y()/32);
+			//Broodwar->sendText("A %s [%x] has been created at (%d,%d)=(%d,%d)",unit->getType().getName().c_str(),unit,
+			//																	unit->getPosition().x(),unit->getPosition().y(),
+			//																	unit->getPosition().x()/32,unit->getPosition().y()/32);
 			if(_buildOrder.empty() == false && unit->getType() == _buildOrder.front()){
 				if( unit->getType().isBuilding() ){
 					builder = NULL;
@@ -393,12 +393,12 @@ void ITUBot::onUnitMorph(BWAPI::Unit* unit)
 
 void ITUBot::onUnitComplete(BWAPI::Unit *unit){
 	if ( !Broodwar->isReplay() && Broodwar->getFrameCount() > 1 ){
-		Broodwar->sendText("A %s [%x] has been completed at (%d,%d)",
+		/*Broodwar->sendText("A %s [%x] has been completed at (%d,%d)",
 							unit->getType().getName().c_str(),
 							unit,unit->getPosition().x(),
 							unit->getPosition().y()
 							);
-
+		 */
 		// send troops to choke point
 		if(unit->getType().isWorker() == false && unit->getType().canAttack() == true){
 			if( choke != NULL){
@@ -454,10 +454,13 @@ void analyzeChoke(){
 		}  
 	}
 
-	maxDist += 10;
+	maxDist += 6;
 	for (int i = tileX - maxDist ; i <= tileX + maxDist ; ++i){
 		for(int j = tileY - maxDist ; j <= tileY + maxDist ; ++j){
-			if( Broodwar->isWalkable(i*BTSize/WTSize , j*BTSize/WTSize) )
+			if( Broodwar->isWalkable(i*BTSize/WTSize +1, j*BTSize/WTSize +2) &&
+				Broodwar->isWalkable(i*BTSize/WTSize +1, j*BTSize/WTSize +1) &&
+				Broodwar->isWalkable(i*BTSize/WTSize +2, j*BTSize/WTSize +1) &&
+				Broodwar->isWalkable(i*BTSize/WTSize +2, j*BTSize/WTSize +2) )
 				walkableTiles.push_back( std::make_pair(i, j) );
 		}
 	}
@@ -646,12 +649,20 @@ void ITUBot::drawTerrainData(){
 
 void ITUBot::drawChokeData(){
 	
-	if( !wallData){
-		// draw buildable tiles
+	if(!wallData){
+		// draw walkable tiles
+		for(unsigned i = 0; i < walkableTiles.size() ; ++i){
+			int x = walkableTiles[i].first;
+			int y = walkableTiles[i].second;
+			Broodwar->drawBoxMap(x*BTSize , y*BTSize, (x+1)*BTSize, (y+1)*BTSize, Colors::Purple, false);
+			Broodwar->drawTextMap(x*BTSize, y*BTSize, "%d,\n%d", x, y);
+		}
+
+		// draw inside buildable tiles
 		for(unsigned i = 0; i < buildTiles.size() ; ++i){
 			int x = buildTiles[i].first;
 			int y = buildTiles[i].second;
-			Broodwar->drawBoxMap(x*BTSize , y*BTSize, (x+1)*BTSize, (y+1)*BTSize, Colors::Green, false);
+			Broodwar->drawBoxMap(x*BTSize+3, y*BTSize+3, (x+1)*BTSize-3, (y+1)*BTSize-3, Colors::Green, false);
 			Broodwar->drawTextMap(x*BTSize, y*BTSize, "%d,\n%d", x, y);
 		}
 		
@@ -669,21 +680,15 @@ void ITUBot::drawChokeData(){
 			Broodwar->drawBoxMap(x*BTSize+8 , y*BTSize+8, (x+1)*BTSize-8, (y+1)*BTSize-8, Colors::Blue, false);
 		}
 
-		// draw buildable tiles
+		// draw outside buildable tiles 
 		for(unsigned i = 0; i < outsideTiles.size() ; ++i){
 			int x = outsideTiles[i].first;
 			int y = outsideTiles[i].second;
-			Broodwar->drawBoxMap(x*BTSize , y*BTSize, (x+1)*BTSize, (y+1)*BTSize, Colors::Cyan, false);
+			Broodwar->drawBoxMap(x*BTSize+3 , y*BTSize+3, (x+1)*BTSize-3, (y+1)*BTSize-3, Colors::Cyan, false);
 			Broodwar->drawTextMap(x*BTSize, y*BTSize, "%d,\n%d", x, y);
 		}
 
-		// draw walkable tiles
-		for(unsigned i = 0; i < walkableTiles.size() ; ++i){
-			int x = walkableTiles[i].first;
-			int y = walkableTiles[i].second;
-			Broodwar->drawBoxMap(x*BTSize , y*BTSize, (x+1)*BTSize, (y+1)*BTSize, Colors::Purple, false);
-			Broodwar->drawTextMap(x*BTSize, y*BTSize, "%d,\n%d", x, y);
-		}
+		
 		int x,y;
 
 		x = insideBase.first; y = insideBase.second;
@@ -902,6 +907,9 @@ void ITUBot::initClingoProgramSource(){
 			<< "width(barracksType,4).	height(barracksType,3)." << endl
 			<< "width(supplyDepotType,3). 	height(supplyDepotType,2)." << endl	 << endl
 
+			<< "costs(supplyDepotType, 100)." << endl
+			<< "costs(barracksType, 150)." << endl
+
 			<< "% Gaps" << endl
 			<< "leftGap(barracksType,16). 	rightGap(barracksType,15).	topGap(barracksType,16). 	bottomGap(barracksType,7)." << endl
 			<< "leftGap(marineType,0). 		rightGap(marineType,0). 	topGap(marineType,0). 		bottomGap(marineType,0)." << endl
@@ -909,14 +917,16 @@ void ITUBot::initClingoProgramSource(){
 
 			<< "% Facts" << endl
 			<< "building(marine1).	type(marine1, marineType)." << endl
-			<< "building(barracks1).	type(barracks1, barracksType)." << endl
+			<< "building(barracks1).	type(barracks1, barracksType)." << endl		
+			<< "building(barracks2).	type(barracks2, barracksType)." << endl
 			<< "building(supplyDepot1).	type(supplyDepot1, supplyDepotType)." << endl
-			<< "building(supplyDepot2).	type(supplyDepot2, supplyDepotType)." << endl   
+			<< "building(supplyDepot2).	type(supplyDepot2, supplyDepotType)." << endl 
+			<< "building(supplyDepot4).	type(supplyDepot4, supplyDepotType)." << endl   
 			<< "building(supplyDepot3).	type(supplyDepot3, supplyDepotType)." << endl << endl
-
+								  
 			<< "% Constraint: two units/buildings cannot occupy the same tile" << endl
 			<< ":- occupiedBy(B1, X, Y), occupiedBy(B2, X, Y), B1 != B2." << endl	  << endl
-
+				 
 			<< "% Tiles occupied by buildings" << endl
 			<< "occupiedBy(B,X2,Y2) :- place(B, X1, Y1)," << endl
 			<< "						type(B, BT), width(BT,Z), height(BT, Q)," << endl
@@ -945,6 +955,7 @@ void ITUBot::initClingoProgramSource(){
 			<< "	B1 != B2, X1=X2+1, Y1=Y2, G=S1+S2," << endl
 			<< "	type(B1,T1), type(B2,T2), rightGap(T2,S2), leftGap(T1,S1)." << endl<< endl
 
+			<< "cost(B, C) :- place(B, X, Y), type(B, BT), costs(BT, COST), C=COST." << endl
 
 			///////////////
 			<< "% Tile information" << endl;
@@ -1012,21 +1023,29 @@ void ITUBot::initClingoProgramSource(){
 			<< "canReach(X1,Y1) :- verticalGap(X1,Y1,X1,Y2,G), G >= S, Y2=Y1+1, canReach(X3,Y1), X3=X1-1, enemyUnitY(S)." << endl
 			<< "canReach(X1,Y1) :- verticalGap(X1,Y1,X1,Y2,G), G >= S, Y2=Y1-1, canReach(X3,Y1), X3=X1-1, enemyUnitY(S)." << endl
 			<< "canReach(X1,Y1) :- verticalGap(X1,Y1,X1,Y2,G), G >= S, Y2=Y1+1, canReach(X3,Y1), X3=X1+1, enemyUnitY(S)." << endl
-			<< "canReach(X1,Y1) :- verticalGap(X1,Y1,X1,Y2,G), G >= S, Y2=Y1-1, canReach(X3,Y1), X3=X1+1, enemyUnitY(S).	" << endl
-			<< "	" << endl
-			<< "	" << endl
+			<< "canReach(X1,Y1) :- verticalGap(X1,Y1,X1,Y2,G), G >= S, Y2=Y1-1, canReach(X3,Y1), X3=X1+1, enemyUnitY(S)." << endl
+
+			//<< ":- place(supplyDepot2, X, Y) | place(barracks2, X, Y)." << endl			// error: |
+			//<< ":- not place(supplyDepot2, X, Y), not place(barracks2, X, Y)." << endl	// unsafe variables X & Y
+
 			<< "% Generate all the potential placements." << endl
-			<< "%1[place(marine1,X,Y) : buildable(marineType,X,Y)]1." << endl				// commented out
+			//<< "%1[place(marine1,X,Y) : buildable(marineType,X,Y)]1." << endl		
+			<< "1[place(barracks1,X,Y) : buildable(barracksType,X,Y)]1." << endl 
+			<< "0[place(barracks2,X,Y) : buildable(barracksType,X,Y)]1." << endl 
+
 			<< "1[place(supplyDepot1,X,Y) : buildable(supplyDepotType,X,Y)]1." << endl
-			<< "1[place(supplyDepot2,X,Y) : buildable(supplyDepotType,X,Y)]1." << endl
-			<< "%1[place(supplyDepot3,X,Y) : buildable(supplyDepotType,X,Y)]1." << endl	    // commented out
-			<< "1[place(barracks1,X,Y) : buildable(barracksType,X,Y)]1." << endl
-
-
+			<< "0[place(supplyDepot2,X,Y) : buildable(supplyDepotType,X,Y)]1." << endl
+			<< "0[place(supplyDepot3,X,Y) : buildable(supplyDepotType,X,Y)]1." << endl	    
+			<< "0[place(supplyDepot4,X,Y) : buildable(supplyDepotType,X,Y)]1." << endl << endl
 
 			<< "% Optimization criterion" << endl
 			<< "#minimize [verticalGap(X1,Y1,X2,Y2,G) = G ]." << endl
-			<< "#minimize [horizontalGap(X1,Y1,X2,Y2,G) = G ]." << endl	 << endl
+			<< "#minimize [horizontalGap(X1,Y1,X2,Y2,G) = G ]." << endl	
+			<< "%#minimize [cost(B, C) = C]." << endl
+			<< "#minimize [place(supplyDepot2,X,Y)]." << endl       
+			<< "#minimize [place(supplyDepot3,X,Y)]." << endl	
+			<< "#minimize [place(supplyDepot4,X,Y)]." << endl	
+			<< "#minimize [place(barracks2,X,Y)]." << endl	 << endl	 	
 
 			<< "#hide." << endl
 			<< "#show place/3." << endl;
@@ -1043,7 +1062,8 @@ void ITUBot::initClingoProgramSource(){
 	
 
 }
-void ITUBot::runASPSolver(){
+void ITUBot::runASPSolver(){							 
+
 	// relative path doesn't work. Don't know why..
 	system("D:/SCAI/IT_WORKS/BWAPI/ITUBot/Clingo/clingo.exe D:/SCAI/IT_WORKS/StarCraft/bwapi-data/AI/ITUBotWall.txt > D:/SCAI/IT_WORKS/StarCraft/bwapi-data/AI/out.txt");
 	//system("../BWAPI/ITUBot/Clingo/clingo.exe bwapi-data/AI/ITUBotWall.txt > bwapi-data/AI/solver-out.txt");
@@ -1058,32 +1078,35 @@ void ITUBot::runASPSolver(){
                 line.erase(line.end()-1);
             lines.push_back(line);
             if(line == "OPTIMUM FOUND"){
-                line = lines[lineCounter-2];	// to be parsed
+                line = lines[lineCounter-2];	// contains final answer that will be parsed
                 break;
             }
-			if(line == "UNSATISFIABLE"){
+			if(line == "UNSATISFIABLE"){	   // error in solver
 				Broodwar->printf("Solver failed finding a solution!");
 				return;
 			}
             lineCounter++;
         }
 
+		// parse the answer, example output below
 		// place(supplyDepot1,119,46) place(supplyDepot2,122,44) place(barracks1,116,52) 
 		std::stringstream ss;
 		std::string token;
-        while(line != ""){
+        while(line != ""){	 // tokenizin the whole line
 			std::vector<int> coords;
 			UnitType type;
 			int val;
 			
 
-            ss << line.substr(6, line.find(")") - 6);
-            while(getline(ss, token, ',')){
+            ss << line.substr(6, line.find(")") - 6);   // place( = 6 chars
+            while(getline(ss, token, ',')){	   // tokenizing the individual place() statements
 				std::istringstream iss(token);
 				iss >> val;
 
 				if( iss.fail() ){
-					std::size_t found = token.find("supplyDepot");
+					std::size_t found = token.find("supplyDepot");	// search for supply depot
+
+					// if found its supply depot, if not found its barracks (early wall)
 					type =	found!=std::string::npos ? UnitTypes::Terran_Supply_Depot : UnitTypes::Terran_Barracks;
 				}
 				else{   // coordinates
@@ -1094,6 +1117,7 @@ void ITUBot::runASPSolver(){
             ss.clear();
             token.clear();
 
+			// add the resutl to data structure after successful parsing for each place() statement
 			wallLayout.push_back( std::make_pair(type, TilePosition(coords[0], coords[1])) );
         }
 		ITUBot::_wall = wallLayout;

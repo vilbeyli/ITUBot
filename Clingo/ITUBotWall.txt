@@ -16,8 +16,11 @@ leftGap(supplyDepotType,12).		 rightGap(supplyDepotType,11). 	topGap(supplyDepot
 % Facts
 building(marine1).	type(marine1, marineType).
 building(barracks1).	type(barracks1, barracksType).
+building(barracks2).	type(barracks2, barracksType).
 building(supplyDepot1).	type(supplyDepot1, supplyDepotType).
 building(supplyDepot2).	type(supplyDepot2, supplyDepotType).
+building(supplyDepot4).	type(supplyDepot4, supplyDepotType).
+building(supplyDepot3).	type(supplyDepot3, supplyDepotType).
 
 % Constraint: two units/buildings cannot occupy the same tile
 :- occupiedBy(B1, X, Y), occupiedBy(B2, X, Y), B1 != B2.
@@ -50,32 +53,857 @@ horizontalGap(X1,Y1,X2,Y2,G) :-
 	B1 != B2, X1=X2+1, Y1=Y2, G=S1+S2,
 	type(B1,T1), type(B2,T2), rightGap(T2,S2), leftGap(T1,S1).
 
-
-
 % Tile information
-walkableTile(1,1..4).
-walkableTile(2..5,1..8).
-walkableTile(6..8,2..8).
-walkableTile(9,3..8).
-walkableTile(10..11,4..8).
+walkableTile(0, 49).
+walkableTile(0, 50).
+walkableTile(0, 51).
+walkableTile(0, 52).
+walkableTile(0, 53).
+walkableTile(0, 54).
+walkableTile(0, 55).
+walkableTile(0, 56).
+walkableTile(0, 57).
+walkableTile(0, 58).
+walkableTile(0, 59).
+walkableTile(0, 60).
+walkableTile(0, 61).
+walkableTile(0, 62).
+walkableTile(0, 63).
+walkableTile(0, 64).
+walkableTile(0, 65).
+walkableTile(0, 66).
+walkableTile(0, 67).
+walkableTile(0, 68).
+walkableTile(0, 69).
+walkableTile(0, 70).
+walkableTile(0, 71).
+walkableTile(0, 74).
+walkableTile(0, 75).
+walkableTile(0, 76).
+walkableTile(0, 77).
+walkableTile(0, 78).
+walkableTile(0, 79).
+walkableTile(0, 80).
+walkableTile(0, 81).
+walkableTile(1, 49).
+walkableTile(1, 50).
+walkableTile(1, 51).
+walkableTile(1, 52).
+walkableTile(1, 53).
+walkableTile(1, 54).
+walkableTile(1, 55).
+walkableTile(1, 56).
+walkableTile(1, 57).
+walkableTile(1, 58).
+walkableTile(1, 59).
+walkableTile(1, 60).
+walkableTile(1, 61).
+walkableTile(1, 62).
+walkableTile(1, 63).
+walkableTile(1, 64).
+walkableTile(1, 65).
+walkableTile(1, 66).
+walkableTile(1, 67).
+walkableTile(1, 68).
+walkableTile(1, 69).
+walkableTile(1, 70).
+walkableTile(1, 71).
+walkableTile(1, 72).
+walkableTile(1, 74).
+walkableTile(1, 75).
+walkableTile(1, 76).
+walkableTile(1, 77).
+walkableTile(1, 78).
+walkableTile(1, 79).
+walkableTile(1, 80).
+walkableTile(1, 81).
+walkableTile(2, 49).
+walkableTile(2, 50).
+walkableTile(2, 51).
+walkableTile(2, 52).
+walkableTile(2, 53).
+walkableTile(2, 54).
+walkableTile(2, 55).
+walkableTile(2, 56).
+walkableTile(2, 57).
+walkableTile(2, 58).
+walkableTile(2, 59).
+walkableTile(2, 60).
+walkableTile(2, 61).
+walkableTile(2, 62).
+walkableTile(2, 63).
+walkableTile(2, 64).
+walkableTile(2, 65).
+walkableTile(2, 66).
+walkableTile(2, 67).
+walkableTile(2, 68).
+walkableTile(2, 69).
+walkableTile(2, 70).
+walkableTile(2, 71).
+walkableTile(2, 72).
+walkableTile(2, 73).
+walkableTile(2, 74).
+walkableTile(2, 75).
+walkableTile(2, 76).
+walkableTile(2, 77).
+walkableTile(2, 78).
+walkableTile(2, 79).
+walkableTile(2, 80).
+walkableTile(2, 81).
+walkableTile(3, 49).
+walkableTile(3, 50).
+walkableTile(3, 51).
+walkableTile(3, 52).
+walkableTile(3, 53).
+walkableTile(3, 54).
+walkableTile(3, 55).
+walkableTile(3, 56).
+walkableTile(3, 57).
+walkableTile(3, 58).
+walkableTile(3, 59).
+walkableTile(3, 60).
+walkableTile(3, 61).
+walkableTile(3, 62).
+walkableTile(3, 63).
+walkableTile(3, 64).
+walkableTile(3, 65).
+walkableTile(3, 66).
+walkableTile(3, 67).
+walkableTile(3, 68).
+walkableTile(3, 69).
+walkableTile(3, 70).
+walkableTile(3, 71).
+walkableTile(3, 72).
+walkableTile(3, 74).
+walkableTile(3, 75).
+walkableTile(3, 76).
+walkableTile(3, 77).
+walkableTile(3, 78).
+walkableTile(3, 79).
+walkableTile(3, 80).
+walkableTile(3, 81).
+walkableTile(4, 49).
+walkableTile(4, 50).
+walkableTile(4, 51).
+walkableTile(4, 52).
+walkableTile(4, 53).
+walkableTile(4, 54).
+walkableTile(4, 55).
+walkableTile(4, 56).
+walkableTile(4, 57).
+walkableTile(4, 58).
+walkableTile(4, 59).
+walkableTile(4, 60).
+walkableTile(4, 61).
+walkableTile(4, 62).
+walkableTile(4, 63).
+walkableTile(4, 64).
+walkableTile(4, 65).
+walkableTile(4, 66).
+walkableTile(4, 67).
+walkableTile(4, 68).
+walkableTile(4, 69).
+walkableTile(4, 70).
+walkableTile(4, 71).
+walkableTile(4, 74).
+walkableTile(4, 75).
+walkableTile(4, 76).
+walkableTile(4, 77).
+walkableTile(4, 78).
+walkableTile(4, 79).
+walkableTile(4, 80).
+walkableTile(4, 81).
+walkableTile(5, 49).
+walkableTile(5, 50).
+walkableTile(5, 51).
+walkableTile(5, 52).
+walkableTile(5, 53).
+walkableTile(5, 54).
+walkableTile(5, 55).
+walkableTile(5, 56).
+walkableTile(5, 57).
+walkableTile(5, 58).
+walkableTile(5, 59).
+walkableTile(5, 60).
+walkableTile(5, 61).
+walkableTile(5, 62).
+walkableTile(5, 63).
+walkableTile(5, 64).
+walkableTile(5, 65).
+walkableTile(5, 66).
+walkableTile(5, 67).
+walkableTile(5, 68).
+walkableTile(5, 69).
+walkableTile(5, 70).
+walkableTile(5, 71).
+walkableTile(5, 72).
+walkableTile(5, 74).
+walkableTile(5, 75).
+walkableTile(5, 76).
+walkableTile(5, 77).
+walkableTile(5, 78).
+walkableTile(5, 79).
+walkableTile(5, 80).
+walkableTile(5, 81).
+walkableTile(6, 49).
+walkableTile(6, 50).
+walkableTile(6, 51).
+walkableTile(6, 52).
+walkableTile(6, 53).
+walkableTile(6, 54).
+walkableTile(6, 55).
+walkableTile(6, 56).
+walkableTile(6, 57).
+walkableTile(6, 58).
+walkableTile(6, 59).
+walkableTile(6, 60).
+walkableTile(6, 61).
+walkableTile(6, 62).
+walkableTile(6, 63).
+walkableTile(6, 64).
+walkableTile(6, 65).
+walkableTile(6, 66).
+walkableTile(6, 67).
+walkableTile(6, 68).
+walkableTile(6, 69).
+walkableTile(6, 70).
+walkableTile(6, 71).
+walkableTile(6, 72).
+walkableTile(6, 74).
+walkableTile(6, 75).
+walkableTile(6, 76).
+walkableTile(6, 77).
+walkableTile(6, 78).
+walkableTile(6, 79).
+walkableTile(6, 80).
+walkableTile(6, 81).
+walkableTile(7, 49).
+walkableTile(7, 50).
+walkableTile(7, 51).
+walkableTile(7, 52).
+walkableTile(7, 53).
+walkableTile(7, 54).
+walkableTile(7, 55).
+walkableTile(7, 56).
+walkableTile(7, 57).
+walkableTile(7, 58).
+walkableTile(7, 59).
+walkableTile(7, 60).
+walkableTile(7, 65).
+walkableTile(7, 66).
+walkableTile(7, 67).
+walkableTile(7, 68).
+walkableTile(7, 69).
+walkableTile(7, 70).
+walkableTile(7, 71).
+walkableTile(7, 74).
+walkableTile(7, 75).
+walkableTile(7, 76).
+walkableTile(7, 77).
+walkableTile(7, 78).
+walkableTile(7, 79).
+walkableTile(7, 80).
+walkableTile(7, 81).
+walkableTile(8, 49).
+walkableTile(8, 50).
+walkableTile(8, 51).
+walkableTile(8, 52).
+walkableTile(8, 53).
+walkableTile(8, 54).
+walkableTile(8, 55).
+walkableTile(8, 56).
+walkableTile(8, 57).
+walkableTile(8, 58).
+walkableTile(8, 59).
+walkableTile(8, 66).
+walkableTile(8, 67).
+walkableTile(8, 68).
+walkableTile(8, 69).
+walkableTile(8, 70).
+walkableTile(8, 71).
+walkableTile(8, 72).
+walkableTile(8, 74).
+walkableTile(8, 75).
+walkableTile(8, 76).
+walkableTile(8, 77).
+walkableTile(8, 78).
+walkableTile(8, 79).
+walkableTile(8, 80).
+walkableTile(8, 81).
+walkableTile(9, 49).
+walkableTile(9, 50).
+walkableTile(9, 51).
+walkableTile(9, 52).
+walkableTile(9, 53).
+walkableTile(9, 54).
+walkableTile(9, 55).
+walkableTile(9, 56).
+walkableTile(9, 57).
+walkableTile(9, 58).
+walkableTile(9, 59).
+walkableTile(9, 61).
+walkableTile(9, 66).
+walkableTile(9, 67).
+walkableTile(9, 68).
+walkableTile(9, 69).
+walkableTile(9, 70).
+walkableTile(9, 71).
+walkableTile(9, 72).
+walkableTile(9, 74).
+walkableTile(9, 75).
+walkableTile(9, 76).
+walkableTile(9, 77).
+walkableTile(9, 78).
+walkableTile(9, 79).
+walkableTile(9, 80).
+walkableTile(9, 81).
+walkableTile(10, 49).
+walkableTile(10, 50).
+walkableTile(10, 51).
+walkableTile(10, 52).
+walkableTile(10, 53).
+walkableTile(10, 54).
+walkableTile(10, 55).
+walkableTile(10, 56).
+walkableTile(10, 57).
+walkableTile(10, 58).
+walkableTile(10, 60).
+walkableTile(10, 61).
+walkableTile(10, 62).
+walkableTile(10, 63).
+walkableTile(10, 65).
+walkableTile(10, 66).
+walkableTile(10, 67).
+walkableTile(10, 68).
+walkableTile(10, 69).
+walkableTile(10, 70).
+walkableTile(10, 71).
+walkableTile(10, 72).
+walkableTile(10, 74).
+walkableTile(10, 75).
+walkableTile(10, 76).
+walkableTile(10, 77).
+walkableTile(10, 78).
+walkableTile(10, 79).
+walkableTile(10, 80).
+walkableTile(10, 81).
+walkableTile(11, 49).
+walkableTile(11, 50).
+walkableTile(11, 51).
+walkableTile(11, 52).
+walkableTile(11, 53).
+walkableTile(11, 54).
+walkableTile(11, 55).
+walkableTile(11, 56).
+walkableTile(11, 57).
+walkableTile(11, 60).
+walkableTile(11, 61).
+walkableTile(11, 62).
+walkableTile(11, 63).
+walkableTile(11, 64).
+walkableTile(11, 65).
+walkableTile(11, 66).
+walkableTile(11, 67).
+walkableTile(11, 69).
+walkableTile(11, 70).
+walkableTile(11, 71).
+walkableTile(11, 72).
+walkableTile(11, 74).
+walkableTile(11, 75).
+walkableTile(11, 76).
+walkableTile(11, 77).
+walkableTile(11, 78).
+walkableTile(11, 79).
+walkableTile(11, 80).
+walkableTile(11, 81).
+walkableTile(12, 49).
+walkableTile(12, 50).
+walkableTile(12, 51).
+walkableTile(12, 52).
+walkableTile(12, 53).
+walkableTile(12, 54).
+walkableTile(12, 55).
+walkableTile(12, 56).
+walkableTile(12, 57).
+walkableTile(12, 60).
+walkableTile(12, 61).
+walkableTile(12, 62).
+walkableTile(12, 63).
+walkableTile(12, 64).
+walkableTile(12, 65).
+walkableTile(12, 69).
+walkableTile(12, 70).
+walkableTile(12, 71).
+walkableTile(12, 73).
+walkableTile(12, 74).
+walkableTile(12, 75).
+walkableTile(12, 76).
+walkableTile(12, 77).
+walkableTile(12, 78).
+walkableTile(12, 79).
+walkableTile(12, 80).
+walkableTile(12, 81).
+walkableTile(13, 49).
+walkableTile(13, 50).
+walkableTile(13, 51).
+walkableTile(13, 52).
+walkableTile(13, 53).
+walkableTile(13, 54).
+walkableTile(13, 55).
+walkableTile(13, 56).
+walkableTile(13, 57).
+walkableTile(13, 58).
+walkableTile(13, 60).
+walkableTile(13, 61).
+walkableTile(13, 62).
+walkableTile(13, 63).
+walkableTile(13, 64).
+walkableTile(13, 65).
+walkableTile(13, 69).
+walkableTile(13, 73).
+walkableTile(13, 74).
+walkableTile(13, 75).
+walkableTile(13, 76).
+walkableTile(13, 77).
+walkableTile(13, 78).
+walkableTile(13, 79).
+walkableTile(13, 80).
+walkableTile(13, 81).
+walkableTile(14, 49).
+walkableTile(14, 50).
+walkableTile(14, 51).
+walkableTile(14, 52).
+walkableTile(14, 53).
+walkableTile(14, 54).
+walkableTile(14, 55).
+walkableTile(14, 56).
+walkableTile(14, 57).
+walkableTile(14, 58).
+walkableTile(14, 60).
+walkableTile(14, 61).
+walkableTile(14, 62).
+walkableTile(14, 63).
+walkableTile(14, 64).
+walkableTile(14, 65).
+walkableTile(14, 72).
+walkableTile(14, 73).
+walkableTile(14, 74).
+walkableTile(14, 75).
+walkableTile(14, 76).
+walkableTile(14, 77).
+walkableTile(14, 78).
+walkableTile(14, 79).
+walkableTile(14, 80).
+walkableTile(14, 81).
+walkableTile(15, 49).
+walkableTile(15, 50).
+walkableTile(15, 51).
+walkableTile(15, 52).
+walkableTile(15, 53).
+walkableTile(15, 54).
+walkableTile(15, 55).
+walkableTile(15, 56).
+walkableTile(15, 57).
+walkableTile(15, 58).
+walkableTile(15, 60).
+walkableTile(15, 61).
+walkableTile(15, 62).
+walkableTile(15, 63).
+walkableTile(15, 64).
+walkableTile(15, 65).
+walkableTile(15, 66).
+walkableTile(15, 70).
+walkableTile(15, 72).
+walkableTile(15, 73).
+walkableTile(15, 74).
+walkableTile(15, 75).
+walkableTile(15, 76).
+walkableTile(15, 77).
+walkableTile(15, 78).
+walkableTile(15, 79).
+walkableTile(15, 80).
+walkableTile(15, 81).
+walkableTile(16, 50).
+walkableTile(16, 51).
+walkableTile(16, 52).
+walkableTile(16, 53).
+walkableTile(16, 54).
+walkableTile(16, 55).
+walkableTile(16, 56).
+walkableTile(16, 57).
+walkableTile(16, 60).
+walkableTile(16, 61).
+walkableTile(16, 62).
+walkableTile(16, 63).
+walkableTile(16, 64).
+walkableTile(16, 65).
+walkableTile(16, 66).
+walkableTile(16, 69).
+walkableTile(16, 70).
+walkableTile(16, 71).
+walkableTile(16, 72).
+walkableTile(16, 73).
+walkableTile(16, 74).
+walkableTile(16, 75).
+walkableTile(16, 76).
+walkableTile(16, 77).
+walkableTile(16, 78).
+walkableTile(16, 79).
+walkableTile(16, 80).
+walkableTile(16, 81).
+walkableTile(17, 50).
+walkableTile(17, 51).
+walkableTile(17, 52).
+walkableTile(17, 53).
+walkableTile(17, 54).
+walkableTile(17, 55).
+walkableTile(17, 56).
+walkableTile(17, 57).
+walkableTile(17, 58).
+walkableTile(17, 60).
+walkableTile(17, 61).
+walkableTile(17, 62).
+walkableTile(17, 63).
+walkableTile(17, 64).
+walkableTile(17, 65).
+walkableTile(17, 66).
+walkableTile(17, 67).
+walkableTile(17, 69).
+walkableTile(17, 70).
+walkableTile(17, 71).
+walkableTile(17, 72).
+walkableTile(17, 73).
+walkableTile(17, 74).
+walkableTile(17, 75).
+walkableTile(17, 76).
+walkableTile(17, 77).
+walkableTile(17, 78).
+walkableTile(17, 79).
+walkableTile(17, 80).
+walkableTile(17, 81).
+walkableTile(18, 50).
+walkableTile(18, 51).
+walkableTile(18, 52).
+walkableTile(18, 53).
+walkableTile(18, 54).
+walkableTile(18, 55).
+walkableTile(18, 56).
+walkableTile(18, 57).
+walkableTile(18, 58).
+walkableTile(18, 60).
+walkableTile(18, 61).
+walkableTile(18, 62).
+walkableTile(18, 63).
+walkableTile(18, 64).
+walkableTile(18, 65).
+walkableTile(18, 66).
+walkableTile(18, 67).
+walkableTile(18, 68).
+walkableTile(18, 69).
+walkableTile(18, 70).
+walkableTile(18, 71).
+walkableTile(18, 72).
+walkableTile(18, 73).
+walkableTile(18, 74).
+walkableTile(18, 75).
+walkableTile(18, 76).
+walkableTile(18, 77).
+walkableTile(18, 78).
+walkableTile(18, 79).
+walkableTile(18, 80).
+walkableTile(18, 81).
+walkableTile(19, 50).
+walkableTile(19, 51).
+walkableTile(19, 52).
+walkableTile(19, 53).
+walkableTile(19, 54).
+walkableTile(19, 55).
+walkableTile(19, 56).
+walkableTile(19, 57).
+walkableTile(19, 58).
+walkableTile(19, 61).
+walkableTile(19, 62).
+walkableTile(19, 63).
+walkableTile(19, 64).
+walkableTile(19, 65).
+walkableTile(19, 66).
+walkableTile(19, 67).
+walkableTile(19, 68).
+walkableTile(19, 69).
+walkableTile(19, 70).
+walkableTile(19, 71).
+walkableTile(19, 72).
+walkableTile(19, 73).
+walkableTile(19, 74).
+walkableTile(19, 75).
+walkableTile(19, 76).
+walkableTile(19, 77).
+walkableTile(19, 78).
+walkableTile(19, 79).
+walkableTile(19, 80).
+walkableTile(19, 81).
+walkableTile(20, 49).
+walkableTile(20, 50).
+walkableTile(20, 51).
+walkableTile(20, 52).
+walkableTile(20, 53).
+walkableTile(20, 54).
+walkableTile(20, 55).
+walkableTile(20, 56).
+walkableTile(20, 57).
+walkableTile(20, 60).
+walkableTile(20, 61).
+walkableTile(20, 62).
+walkableTile(20, 63).
+walkableTile(20, 64).
+walkableTile(20, 65).
+walkableTile(20, 66).
+walkableTile(20, 67).
+walkableTile(20, 68).
+walkableTile(20, 69).
+walkableTile(20, 70).
+walkableTile(20, 71).
+walkableTile(20, 72).
+walkableTile(20, 73).
+walkableTile(20, 74).
+walkableTile(20, 75).
+walkableTile(20, 76).
+walkableTile(20, 77).
+walkableTile(20, 78).
+walkableTile(20, 79).
+walkableTile(20, 80).
+walkableTile(20, 81).
+walkableTile(21, 49).
+walkableTile(21, 50).
+walkableTile(21, 51).
+walkableTile(21, 52).
+walkableTile(21, 53).
+walkableTile(21, 54).
+walkableTile(21, 55).
+walkableTile(21, 56).
+walkableTile(21, 57).
+walkableTile(21, 58).
+walkableTile(21, 62).
+walkableTile(21, 63).
+walkableTile(21, 64).
+walkableTile(21, 65).
+walkableTile(21, 66).
+walkableTile(21, 67).
+walkableTile(21, 68).
+walkableTile(21, 69).
+walkableTile(21, 70).
+walkableTile(21, 71).
+walkableTile(21, 72).
+walkableTile(21, 73).
+walkableTile(21, 74).
+walkableTile(21, 75).
+walkableTile(21, 76).
+walkableTile(21, 77).
+walkableTile(21, 78).
+walkableTile(21, 79).
+walkableTile(21, 80).
+walkableTile(21, 81).
+walkableTile(22, 49).
+walkableTile(22, 50).
+walkableTile(22, 51).
+walkableTile(22, 52).
+walkableTile(22, 53).
+walkableTile(22, 54).
+walkableTile(22, 55).
+walkableTile(22, 56).
+walkableTile(22, 57).
+walkableTile(22, 58).
+walkableTile(22, 59).
+walkableTile(22, 63).
+walkableTile(22, 64).
+walkableTile(22, 65).
+walkableTile(22, 66).
+walkableTile(22, 67).
+walkableTile(22, 68).
+walkableTile(22, 69).
+walkableTile(22, 70).
+walkableTile(22, 71).
+walkableTile(22, 72).
+walkableTile(22, 73).
+walkableTile(22, 74).
+walkableTile(22, 75).
+walkableTile(22, 76).
+walkableTile(22, 77).
+walkableTile(22, 78).
+walkableTile(22, 79).
+walkableTile(22, 80).
+walkableTile(22, 81).
+walkableTile(23, 49).
+walkableTile(23, 50).
+walkableTile(23, 51).
+walkableTile(23, 52).
+walkableTile(23, 53).
+walkableTile(23, 54).
+walkableTile(23, 55).
+walkableTile(23, 56).
+walkableTile(23, 57).
+walkableTile(23, 58).
+walkableTile(23, 59).
+walkableTile(23, 60).
+walkableTile(23, 63).
+walkableTile(23, 64).
+walkableTile(23, 65).
+walkableTile(23, 66).
+walkableTile(23, 67).
+walkableTile(23, 68).
+walkableTile(23, 69).
+walkableTile(23, 70).
+walkableTile(23, 71).
+walkableTile(23, 72).
+walkableTile(23, 73).
+walkableTile(23, 74).
+walkableTile(23, 75).
+walkableTile(23, 76).
+walkableTile(23, 77).
+walkableTile(23, 78).
+walkableTile(23, 79).
+walkableTile(23, 80).
+walkableTile(23, 81).
+walkableTile(24, 49).
+walkableTile(24, 50).
+walkableTile(24, 51).
+walkableTile(24, 52).
+walkableTile(24, 53).
+walkableTile(24, 54).
+walkableTile(24, 55).
+walkableTile(24, 56).
+walkableTile(24, 57).
+walkableTile(24, 58).
+walkableTile(24, 59).
+walkableTile(24, 60).
+walkableTile(24, 61).
+walkableTile(24, 64).
+walkableTile(24, 65).
+walkableTile(24, 66).
+walkableTile(24, 67).
+walkableTile(24, 68).
+walkableTile(24, 69).
+walkableTile(24, 70).
+walkableTile(24, 71).
+walkableTile(24, 72).
+walkableTile(24, 73).
+walkableTile(24, 74).
+walkableTile(24, 75).
+walkableTile(24, 76).
+walkableTile(24, 77).
+walkableTile(24, 78).
+walkableTile(24, 79).
+walkableTile(24, 80).
+walkableTile(24, 81).
+walkableTile(25, 49).
+walkableTile(25, 50).
+walkableTile(25, 51).
+walkableTile(25, 52).
+walkableTile(25, 53).
+walkableTile(25, 54).
+walkableTile(25, 55).
+walkableTile(25, 56).
+walkableTile(25, 57).
+walkableTile(25, 58).
+walkableTile(25, 59).
+walkableTile(25, 60).
+walkableTile(25, 61).
+walkableTile(25, 62).
+walkableTile(25, 64).
+walkableTile(25, 65).
+walkableTile(25, 66).
+walkableTile(25, 67).
+walkableTile(25, 68).
+walkableTile(25, 69).
+walkableTile(25, 70).
+walkableTile(25, 71).
+walkableTile(25, 72).
+walkableTile(25, 73).
+walkableTile(25, 74).
+walkableTile(25, 75).
+walkableTile(25, 76).
+walkableTile(25, 77).
+walkableTile(25, 78).
+walkableTile(25, 79).
+walkableTile(25, 80).
+walkableTile(25, 81).
+walkableTile(26, 49).
+walkableTile(26, 50).
+walkableTile(26, 51).
+walkableTile(26, 52).
+walkableTile(26, 53).
+walkableTile(26, 54).
+walkableTile(26, 55).
+walkableTile(26, 56).
+walkableTile(26, 57).
+walkableTile(26, 58).
+walkableTile(26, 59).
+walkableTile(26, 60).
+walkableTile(26, 61).
+walkableTile(26, 62).
+walkableTile(26, 65).
+walkableTile(26, 66).
+walkableTile(26, 67).
+walkableTile(26, 68).
+walkableTile(26, 69).
+walkableTile(26, 70).
+walkableTile(26, 71).
+walkableTile(26, 72).
+walkableTile(26, 73).
+walkableTile(26, 74).
+walkableTile(26, 75).
+walkableTile(26, 76).
+walkableTile(26, 77).
+walkableTile(26, 78).
+walkableTile(26, 79).
+walkableTile(26, 80).
+walkableTile(26, 81).
+buildable(barracksType, 10, 60).
+buildable(barracksType, 11, 60).
+buildable(barracksType, 12, 60).
+buildable(barracksType, 13, 60).
+buildable(barracksType, 14, 60).
+buildable(barracksType, 14, 61).
+buildable(barracksType, 14, 62).
+buildable(barracksType, 14, 63).
+buildable(barracksType, 15, 61).
+buildable(barracksType, 15, 62).
+buildable(barracksType, 15, 63).
+buildable(barracksType, 16, 61).
+buildable(barracksType, 16, 62).
+buildable(barracksType, 16, 63).
+buildable(barracksType, 16, 64).
+buildable(barracksType, 16, 69).
+buildable(barracksType, 16, 70).
+buildable(barracksType, 16, 71).
+buildable(supplyDepotType, 10, 60).
+buildable(supplyDepotType, 10, 61).
+buildable(supplyDepotType, 11, 60).
+buildable(supplyDepotType, 11, 61).
+buildable(supplyDepotType, 12, 60).
+buildable(supplyDepotType, 12, 61).
+buildable(supplyDepotType, 13, 60).
+buildable(supplyDepotType, 13, 61).
+buildable(supplyDepotType, 14, 60).
+buildable(supplyDepotType, 14, 61).
+buildable(supplyDepotType, 14, 62).
+buildable(supplyDepotType, 14, 63).
+buildable(supplyDepotType, 14, 64).
+buildable(supplyDepotType, 15, 60).
+buildable(supplyDepotType, 15, 61).
+buildable(supplyDepotType, 15, 62).
+buildable(supplyDepotType, 15, 63).
+buildable(supplyDepotType, 15, 64).
+buildable(supplyDepotType, 16, 61).
+buildable(supplyDepotType, 16, 62).
+buildable(supplyDepotType, 16, 63).
+buildable(supplyDepotType, 16, 64).
+buildable(supplyDepotType, 16, 65).
+buildable(supplyDepotType, 16, 69).
+buildable(supplyDepotType, 16, 70).
+buildable(supplyDepotType, 16, 71).
 
-buildable(barracksType, 2..8, 5).
-buildable(barracksType, 4..8, 4).
-buildable(barracksType, 5..6, 3).
-
-buildable(supplyDepotType, 2..9, 5..6). 
-buildable(supplyDepotType, 4..9, 4).
-buildable(supplyDepotType, 5..7, 3).
-buildable(supplyDepotType, 6, 2).
-
-buildable(marineType, 2..11, 5).
-buildable(marineType, 4..11, 4).
-buildable(marineType, 5..9, 3).
-buildable(marineType, 6..8, 2).
-
-outsideBase(2,2).	insideBase(7,8).
-
-
+insideBase(9, 81).	outsideBase(4, 59).
 
 % Constraint: Inside of the base must not be reachable.
 :- insideBase(X2,Y2), outsideBase(X1,Y1), canReach(X2,Y2).
@@ -110,7 +938,7 @@ canReach(X2,Y2) :-
 	not blocked(X1,Y1), not blocked(X2,Y2).
 
 % Using gaps to reach (walk on) blocked locations.
-enemyUnitX(16). enemyUnitY(16).
+enemyUnitX(32). enemyUnitY(32).
 canReach(X1,Y1) :- horizontalGap(X1,Y1,X2,Y1,G), G >= S, X2=X1+1, canReach(X1,Y3), Y3=Y1+1, enemyUnitX(S).
 canReach(X1,Y1) :- horizontalGap(X1,Y1,X2,Y1,G), G >= S, X2=X1-1, canReach(X1,Y3), Y3=Y1+1, enemyUnitX(S).
 canReach(X1,Y1) :- horizontalGap(X1,Y1,X2,Y1,G), G >= S, X2=X1+1, canReach(X1,Y3), Y3=Y1-1, enemyUnitX(S).
@@ -119,20 +947,24 @@ canReach(X1,Y1) :- verticalGap(X1,Y1,X1,Y2,G), G >= S, Y2=Y1+1, canReach(X3,Y1),
 canReach(X1,Y1) :- verticalGap(X1,Y1,X1,Y2,G), G >= S, Y2=Y1-1, canReach(X3,Y1), X3=X1-1, enemyUnitY(S).
 canReach(X1,Y1) :- verticalGap(X1,Y1,X1,Y2,G), G >= S, Y2=Y1+1, canReach(X3,Y1), X3=X1+1, enemyUnitY(S).
 canReach(X1,Y1) :- verticalGap(X1,Y1,X1,Y2,G), G >= S, Y2=Y1-1, canReach(X3,Y1), X3=X1+1, enemyUnitY(S).	
-	
-	
+
+:- place(supplyDepot2, X, Y) & place(barracks2, X, Y).
+
 % Generate all the potential placements.
-%1[place(marine1,X,Y) : buildable(marineType,X,Y)]1.
+1[place(barracks1,X,Y) : buildable(barracksType,X,Y)]1.
+%0[place(barracks2,X,Y) : buildable(barracksType,X,Y)]1.
 1[place(supplyDepot1,X,Y) : buildable(supplyDepotType,X,Y)]1.
 1[place(supplyDepot2,X,Y) : buildable(supplyDepotType,X,Y)]1.
-1[place(barracks1,X,Y) : buildable(barracksType,X,Y)]1.
-
-
+%0[place(supplyDepot3,X,Y) : buildable(supplyDepotType,X,Y)]1.
+%0[place(supplyDepot4,X,Y) : buildable(supplyDepotType,X,Y)]1.
 
 % Optimization criterion
 #minimize [verticalGap(X1,Y1,X2,Y2,G) = G ].
 #minimize [horizontalGap(X1,Y1,X2,Y2,G) = G ].
+%#minimize [place(supplyDepot4,X,Y)].
+%#minimize [place(supplyDepot3,X,Y)].
+%#minimize [place(supplyDepot2,X,Y)].
+%#minimize [place(barracks2,X,Y)].
 
 #hide.
 #show place/3.
-%#show walkableTile/2.
