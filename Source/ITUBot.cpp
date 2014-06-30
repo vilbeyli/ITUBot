@@ -13,6 +13,8 @@
 using namespace BWAPI;
 using std::endl;
 
+#define GAP
+
 ///////////////////// GLOBAL VARIABLES
 
 // map analysis variables
@@ -23,6 +25,7 @@ BWTA::Region* enemy_base;
 
 Unit* chokeGuardian = NULL; 
 BWTA::Chokepoint* choke=NULL;
+
 
 // choke analysis
 std::string clingoProgramText;  
@@ -428,7 +431,7 @@ void analyzeChoke(){
 
  	// choke point analysis
 	int x =	choke->getCenter().x(); int y = choke->getCenter().y();
-	int maxDist = 7;				
+	int maxDist = 10;				
 	int tileX = x/BTSize;			int tileY = y/BTSize;
 
 	// analysis of build tiles near choke points
@@ -438,10 +441,15 @@ void analyzeChoke(){
 			// buildable tile positions
 			if( Broodwar->isBuildable( TilePosition(i,j) ) ){
 
+
 				// high ground (inside base) tiles
+				/*
 				if( Broodwar->getGroundHeight( TilePosition(i,j) ) >= 2)
 					buildTiles.push_back( std::make_pair(i, j) );
-					
+				*/
+				if( BWTA::getRegion(TilePosition(i,j)) == home)
+					 buildTiles.push_back( std::make_pair(i, j) );
+
 
 				// lower ground (outside base) tiles
 				else
@@ -481,7 +489,6 @@ void analyzeChoke(){
 		if( Broodwar->canBuildHere( builderr, pos, UnitTypes::Terran_Barracks, false ) )
 			barracksTiles.push_back( std::make_pair(pos.x(), pos.y()) );
 	}
-	
 	
 	
 	return;
@@ -715,7 +722,7 @@ void ITUBot::drawChokeData(){
 		}
 		*/
 	}
-	else{
+	else{	   // if wall data
 		for(unsigned i = 0; i < wallLayout.size() ; ++i){
 			int x = wallLayout[i].second.x();
 			int y = wallLayout[i].second.y();
@@ -724,6 +731,12 @@ void ITUBot::drawChokeData(){
 			Broodwar->drawBoxMap(x*BTSize, y*BTSize, (x+w)*BTSize, (y+h)*BTSize, Colors::Orange, false);
 		}
 	}
+
+
+	// draw region centers
+	std::pair<BWTA::Region*, BWTA::Region*> regs = choke->getRegions();
+	Broodwar->drawTextMap(regs.first->getCenter().x(),  regs.first->getCenter().y(), "Center 1");
+	Broodwar->drawTextMap(regs.second->getCenter().x(), regs.second->getCenter().y(), "Center 2"); 
 }
 
 /////
@@ -911,9 +924,9 @@ void ITUBot::initClingoProgramSource(){
 			<< "costs(barracksType, 150)." << endl
 
 			<< "% Gaps" << endl
-			<< "leftGap(barracksType,16). 	rightGap(barracksType,15).	topGap(barracksType,16). 	bottomGap(barracksType,7)." << endl
+			<< "leftGap(barracksType,16). 	rightGap(barracksType,7).	topGap(barracksType,8). 	bottomGap(barracksType,15)." << endl
 			<< "leftGap(marineType,0). 		rightGap(marineType,0). 	topGap(marineType,0). 		bottomGap(marineType,0)." << endl
-			<< "leftGap(supplyDepotType,12).		 rightGap(supplyDepotType,11). 	topGap(supplyDepotType,8). 		bottomGap(supplyDepotType,11)." << endl	 << endl
+			<< "leftGap(supplyDepotType,10).		 rightGap(supplyDepotType,9). 	topGap(supplyDepotType,10). 		bottomGap(supplyDepotType,5)." << endl	 << endl
 
 			<< "% Facts" << endl
 			<< "building(marine1).	type(marine1, marineType)." << endl
@@ -1037,22 +1050,31 @@ void ITUBot::initClingoProgramSource(){
 			<< "0[place(supplyDepot2,X,Y) : buildable(supplyDepotType,X,Y)]1." << endl
 			<< "0[place(supplyDepot3,X,Y) : buildable(supplyDepotType,X,Y)]1." << endl	    
 			<< "0[place(supplyDepot4,X,Y) : buildable(supplyDepotType,X,Y)]1." << endl << endl
+																  
+			<< "% Optimization criterion" << endl	
+#ifdef GAP
+			<< "#minimize [horizontalGap(X1,Y1,X2,Y2,G) = G @1 ]." << endl	
+			<< "#minimize [verticalGap(X1,Y1,X2,Y2,G) = G @1 ]." << endl
+			<< "#minimize [place(supplyDepot2,X,Y) @2]." << endl       
+			<< "#minimize [place(supplyDepot3,X,Y) @2]." << endl	
+			<< "#minimize [place(supplyDepot4,X,Y) @2]." << endl	
+			<< "#minimize [place(barracks2,X,Y) @2]. " << endl	 << endl	 	
 
-			<< "% Optimization criterion" << endl
-			<< "#minimize [verticalGap(X1,Y1,X2,Y2,G) = G ]." << endl
-			<< "#minimize [horizontalGap(X1,Y1,X2,Y2,G) = G ]." << endl	
-			<< "%#minimize [cost(B, C) = C]." << endl
-			<< "#minimize [place(supplyDepot2,X,Y)]." << endl       
-			<< "#minimize [place(supplyDepot3,X,Y)]." << endl	
-			<< "#minimize [place(supplyDepot4,X,Y)]." << endl	
-			<< "#minimize [place(barracks2,X,Y)]." << endl	 << endl	 	
+#else 
+			<< "#minimize [cost(B, C) = C]." << endl
 
+#endif
 			<< "#hide." << endl
 			<< "#show place/3." << endl;
 
 
 
-			BWAPI::Broodwar->printf("ASP Solver Contents Ready!");
+		BWAPI::Broodwar->printf("ASP Solver Contents Ready!");
+#ifdef GAP
+		BWAPI::Broodwar->printf("Optimization: GAP");
+#else
+		BWAPI::Broodwar->printf("Optimization: COST");
+#endif
 
 		file.close();
 	}
@@ -1113,15 +1135,33 @@ void ITUBot::runASPSolver(){
 					coords.push_back(val);
 				}
             }
+
+			// erase the parsed part including the closing parenthesis and space
             line.erase(0, line.find(")")+2);
-            ss.clear();
+            
+			// clear buffers
+			ss.clear();
             token.clear();
 
-			// add the resutl to data structure after successful parsing for each place() statement
+			// add the result to data structure after successful parsing for each place() statement
 			wallLayout.push_back( std::make_pair(type, TilePosition(coords[0], coords[1])) );
         }
+
+		// save results into bots memory
 		ITUBot::_wall = wallLayout;
+		
         file.close();
+
+		// finally, add choke point width to the output file
+		std::ofstream  oFile("D:/SCAI/IT_WORKS/StarCraft/bwapi-data/AI/out.txt", std::ios::app);
+
+		if(oFile.is_open()){
+			oFile << "Choke Width: " << choke->getWidth() << endl;
+			oFile.close();
+		}
+		else{
+			Broodwar->printf("Error opening output file");
+		}
     }
 	else
 		Broodwar->printf("** ERROR OPENING SOLVER OUTPUT FILE");
@@ -1255,7 +1295,9 @@ std::pair<int, int> findClosestTile(const std::vector<std::pair<int, int> >& til
 	double dist = 9000000000;
 
 	for(std::vector<std::pair<int, int> >::const_iterator it = walkableTiles.begin() ; it != walkableTiles.end() ; ++it){
-		if(p.getDistance( Position(it->first*BTSize, it->second*BTSize) ) <= dist){
+		if(p.getDistance( Position(it->first*BTSize, it->second*BTSize) ) <= dist && 
+			p.hasPath( Position(it->first*BTSize, it->second*BTSize) ) 
+		){
 			dist =	p.getDistance( Position(it->first*BTSize, it->second*BTSize) );
 			ret = *it;
 		}
@@ -1280,7 +1322,9 @@ std::pair<int, int> findFarthestTile(const std::vector<std::pair<int, int> >& ti
 	double dist = 0;
 
 	for(std::vector<std::pair<int, int> >::const_iterator it = tiles.begin() ; it != tiles.end() ; ++it){
-		if(p.getDistance( Position(it->first*BTSize, it->second*BTSize) ) >= dist){
+		if(p.getDistance( Position(it->first*BTSize, it->second*BTSize) ) >= dist && 
+			p.hasPath( Position(it->first*BTSize, it->second*BTSize) ) 
+		){
 			dist =	p.getDistance( Position(it->first*BTSize, it->second*BTSize) );
 			ret = *it;
 		}
