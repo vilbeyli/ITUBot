@@ -18,6 +18,8 @@ using std::endl;
 ///////////////////// GLOBAL VARIABLES
 
 // map analysis variables
+bool optimizeGap = true;
+
 bool analyzed;
 bool analysis_just_finished = false;
 BWTA::Region* home;
@@ -260,10 +262,17 @@ void ITUBot::onSendText(std::string text)
 	} else if (text=="/show visibility")
 	{
 		show_visibility_data=!show_visibility_data;
-	} else if (text=="/ASP")
+	} else if (text=="/asp")
 	{
 		wallData = !wallData;
-	} else
+	} else if (text=="/opt" && analyzed == false)
+	{
+		optimizeGap = !optimizeGap;
+		optimizeGap ? BWAPI::Broodwar->printf("Optimization: GAP") 
+					: BWAPI::Broodwar->printf("Optimization: COST");
+	}
+	
+	else
 	{
 		Broodwar->printf("You typed '%s'!",text.c_str());
 		Broodwar->sendText("%s",text.c_str());
@@ -438,37 +447,36 @@ void analyzeChoke(){
 	for (int i = tileX - maxDist ; i <= tileX + maxDist ; ++i){
 		for(int j = tileY - maxDist ; j <= tileY + maxDist ; ++j){
 
-			// buildable tile positions
-			if( Broodwar->isBuildable( TilePosition(i,j) ) ){
-
-
-				// high ground (inside base) tiles
-				/*
-				if( Broodwar->getGroundHeight( TilePosition(i,j) ) >= 2)
+			// if the tile is in home region
+			if( BWTA::getRegion(TilePosition(i,j)) == home){
+				// and it is buildable, add it to the buildTiles
+				if( Broodwar->isBuildable( TilePosition(i,j) ) ){
 					buildTiles.push_back( std::make_pair(i, j) );
-				*/
-				if( BWTA::getRegion(TilePosition(i,j)) == home)
-					 buildTiles.push_back( std::make_pair(i, j) );
-
-
-				// lower ground (outside base) tiles
-				else
+				}
+			}
+			// if the tile is outside the home region
+			else {
+				// and it is walkable, add it to the outside tiles
+				if( Broodwar->isWalkable(i*BTSize/WTSize +1, j*BTSize/WTSize +2) &&
+					Broodwar->isWalkable(i*BTSize/WTSize +1, j*BTSize/WTSize +1) &&
+					Broodwar->isWalkable(i*BTSize/WTSize +2, j*BTSize/WTSize +1) &&
+					Broodwar->isWalkable(i*BTSize/WTSize +2, j*BTSize/WTSize +2) 
+					)
 					outsideTiles.push_back( std::make_pair(i, j) );
-					//Broodwar->drawBox(CoordinateType::Map, i*32, j*32, 32*(i+1), 32*(j+1), Colors::Cyan, false);	
-				
 			}
 			
 			  
 		}  
 	}
 
-	maxDist += 6;
+	maxDist += 2;
 	for (int i = tileX - maxDist ; i <= tileX + maxDist ; ++i){
 		for(int j = tileY - maxDist ; j <= tileY + maxDist ; ++j){
 			if( Broodwar->isWalkable(i*BTSize/WTSize +1, j*BTSize/WTSize +2) &&
 				Broodwar->isWalkable(i*BTSize/WTSize +1, j*BTSize/WTSize +1) &&
 				Broodwar->isWalkable(i*BTSize/WTSize +2, j*BTSize/WTSize +1) &&
-				Broodwar->isWalkable(i*BTSize/WTSize +2, j*BTSize/WTSize +2) )
+				Broodwar->isWalkable(i*BTSize/WTSize +2, j*BTSize/WTSize +2) 
+				)
 				walkableTiles.push_back( std::make_pair(i, j) );
 		}
 	}
@@ -531,27 +539,29 @@ DWORD WINAPI AnalyzeThread(){
 /////
 void ITUBot::drawStats()
 {
-  // Display the game frame rate as text in the upper left area of the screen
-  Broodwar->drawTextScreen(200, 0,  "FPS: %d", Broodwar->getFPS() );
-  Broodwar->drawTextScreen(200, 20, "Average FPS: %f", Broodwar->getAverageFPS() );
+	// Display the game frame rate as text in the upper left area of the screen
+	Broodwar->drawTextScreen(200, 0,  "FPS: %d", Broodwar->getFPS() );
+	Broodwar->drawTextScreen(200, 20, "Average FPS: %f", Broodwar->getAverageFPS() );
 
-  std::set<Unit*> myUnits = Broodwar->self()->getUnits();
-  Broodwar->drawTextScreen(5,0,"I have %d units:",myUnits.size());
-  std::map<UnitType, int> unitTypeCounts;
-  for(std::set<Unit*>::iterator i=myUnits.begin();i!=myUnits.end();i++)
-  {
-    if (unitTypeCounts.find((*i)->getType())==unitTypeCounts.end())
-    {
-      unitTypeCounts.insert(std::make_pair((*i)->getType(),0));
-    }
-    unitTypeCounts.find((*i)->getType())->second++;
-  }
-  int line=1;
-  for(std::map<UnitType,int>::iterator i=unitTypeCounts.begin();i!=unitTypeCounts.end();i++)
-  {
-    Broodwar->drawTextScreen(5,16*line,"- %d %ss",(*i).second, (*i).first.getName().c_str());
-    line++;
-  }
+	std::set<Unit*> myUnits = Broodwar->self()->getUnits();
+	Broodwar->drawTextScreen(5,0,"I have %d units:",myUnits.size());
+	std::map<UnitType, int> unitTypeCounts;
+	for(std::set<Unit*>::iterator i=myUnits.begin();i!=myUnits.end();i++){
+		if (unitTypeCounts.find((*i)->getType())==unitTypeCounts.end()){
+			unitTypeCounts.insert(std::make_pair((*i)->getType(),0));
+		}
+		unitTypeCounts.find((*i)->getType())->second++;
+	}
+
+	int line=1;
+	for(std::map<UnitType,int>::iterator i=unitTypeCounts.begin();i!=unitTypeCounts.end();i++)
+	{
+		Broodwar->drawTextScreen(5,16*line,"- %d %ss",(*i).second, (*i).first.getName().c_str());
+		line++;
+	}
+	optimizeGap ? Broodwar->drawTextScreen(5, 16*line, "Optimization Mode: Gap") 
+				: Broodwar->drawTextScreen(5, 16*line, "Optimization Mode: Cost");	
+
 }
 
 void ITUBot::drawBullets()
@@ -1042,7 +1052,6 @@ void ITUBot::initClingoProgramSource(){
 			//<< ":- not place(supplyDepot2, X, Y), not place(barracks2, X, Y)." << endl	// unsafe variables X & Y
 
 			<< "% Generate all the potential placements." << endl
-			//<< "%1[place(marine1,X,Y) : buildable(marineType,X,Y)]1." << endl		
 			<< "1[place(barracks1,X,Y) : buildable(barracksType,X,Y)]1." << endl 
 			<< "0[place(barracks2,X,Y) : buildable(barracksType,X,Y)]1." << endl 
 
@@ -1051,30 +1060,30 @@ void ITUBot::initClingoProgramSource(){
 			<< "0[place(supplyDepot3,X,Y) : buildable(supplyDepotType,X,Y)]1." << endl	    
 			<< "0[place(supplyDepot4,X,Y) : buildable(supplyDepotType,X,Y)]1." << endl << endl
 																  
-			<< "% Optimization criterion" << endl	
-#ifdef GAP
-			<< "#minimize [horizontalGap(X1,Y1,X2,Y2,G) = G @1 ]." << endl	
-			<< "#minimize [verticalGap(X1,Y1,X2,Y2,G) = G @1 ]." << endl
-			<< "#minimize [place(supplyDepot2,X,Y) @2]." << endl       
-			<< "#minimize [place(supplyDepot3,X,Y) @2]." << endl	
-			<< "#minimize [place(supplyDepot4,X,Y) @2]." << endl	
-			<< "#minimize [place(barracks2,X,Y) @2]. " << endl	 << endl	 	
+			<< "% Optimization criterion" << endl;	
 
-#else 
-			<< "#minimize [cost(B, C) = C]." << endl
+			if(optimizeGap){
+				file << "#minimize [horizontalGap(X1,Y1,X2,Y2,G) = G @1 ]." << endl	
+				<< "#minimize [verticalGap(X1,Y1,X2,Y2,G) = G @1 ]." << endl
+				<< "#minimize [place(supplyDepot2,X,Y) @2]." << endl       
+				<< "#minimize [place(supplyDepot3,X,Y) @2]." << endl	
+				<< "#minimize [place(supplyDepot4,X,Y) @2]." << endl	
+				<< "#minimize [place(barracks2,X,Y) @2]. " << endl	 << endl;	 
+			}
+			else
+				file << "#minimize [cost(B, C) = C]." << endl;
 
-#endif
-			<< "#hide." << endl
+
+			file << "#hide." << endl
 			<< "#show place/3." << endl;
 
 
 
 		BWAPI::Broodwar->printf("ASP Solver Contents Ready!");
-#ifdef GAP
-		BWAPI::Broodwar->printf("Optimization: GAP");
-#else
-		BWAPI::Broodwar->printf("Optimization: COST");
-#endif
+
+		optimizeGap ? BWAPI::Broodwar->printf("Optimization: GAP") 
+					: BWAPI::Broodwar->printf("Optimization: COST");
+
 
 		file.close();
 	}
@@ -1310,6 +1319,8 @@ std::pair<int, int> findClosestTile(const std::vector<std::pair<int, int> >& til
 
 std::pair<int, int> findFarthestTile(const std::vector<std::pair<int, int> >& tiles){
 	std::pair<int, int> ret;
+
+	// get the position of the command center
 	Position p;
 	std::set<Unit*> units = Broodwar->self()->getUnits();
 	for(std::set<Unit*>::const_iterator u = units.begin() ; u != units.end() ; ++u){
@@ -1321,6 +1332,7 @@ std::pair<int, int> findFarthestTile(const std::vector<std::pair<int, int> >& ti
 	
 	double dist = 0;
 
+	// pick the farthest tile
 	for(std::vector<std::pair<int, int> >::const_iterator it = tiles.begin() ; it != tiles.end() ; ++it){
 		if(p.getDistance( Position(it->first*BTSize, it->second*BTSize) ) >= dist && 
 			p.hasPath( Position(it->first*BTSize, it->second*BTSize) ) 
