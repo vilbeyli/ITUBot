@@ -10,6 +10,8 @@ The problem is formulated as a [constraint satisfaction problem](http://en.wikip
 
 -------------
 
+The project is coded on Visual Studio 2008 Express.
+
 Related Events/Groups
 =======
 
