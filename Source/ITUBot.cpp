@@ -469,7 +469,7 @@ void analyzeChoke(){
 		}  
 	}
 
-	maxDist += 2;
+	maxDist += 4;
 	for (int i = tileX - maxDist ; i <= tileX + maxDist ; ++i){
 		for(int j = tileY - maxDist ; j <= tileY + maxDist ; ++j){
 			if( Broodwar->isWalkable(i*BTSize/WTSize +1, j*BTSize/WTSize +2) &&

@@ -14,6 +14,7 @@ DWORD WINAPI AnalyzeThread();
 class ITUBot : public BWAPI::AIModule
 {
 public:
+	// BWAPI AI Module functions
 	virtual void onStart();
 	virtual void onEnd(bool isWinner);
 	virtual void onFrame();
@@ -39,6 +40,7 @@ public:
 	void drawTerrainData();
 	void drawChokeData();
 
+	// data functions
 	void showPlayers();
 	void showForces();
 	bool show_bullets;
