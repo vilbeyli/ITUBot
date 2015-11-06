@@ -27,3 +27,4 @@ Related Events/Groups
  - [Student StarCraft AI Tournament (SSCAI)](http://www.sscaitournament.com/)
  - [AIIDE StarCraft AI Competition](http://webdocs.cs.ualberta.ca/~cdavid/starcraftaicomp/index.shtml)
  - [BWAPI Facebook Group](https://www.facebook.com/groups/bwapi/)
+ - [StarCraft AI Wiki](http://www.starcraftai.com/wiki/Main_Page)
