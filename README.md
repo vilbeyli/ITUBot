@@ -13,13 +13,15 @@ The problem is formulated as a [constraint satisfaction problem](http://en.wikip
 
 [Here is a video of ITUBot walling in.](http://www.youtube.com/watch?v=WdhIv_yxIbM)
 
+[![IMAGE ALT TEXT HERE](http://img.youtube.com/vi/WdhIv_yxIbM/0.jpg)](http://www.youtube.com/watch?v=WdhIv_yxIbM)
+
 *: <sub>Sorry for the horrible formatting, the university formatting rules were unfortunately strict.</sub>
 
 -------------
 
 The project is coded on Visual Studio 2008 Express. 
 
-**Update**: Oh god, its horrible to look at that code. Apologies for the coding horrors in the base code, it was my first real-time program. Hopefully the report will help make more sense.
+**Update**: Oh god, its horrible to look at that code. Apologies for the coding horrors in the source code, it was my first real-time program. Hopefully the report will help make more sense.
 
 Related Events/Groups
 =======
